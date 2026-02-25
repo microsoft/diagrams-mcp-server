@@ -4,10 +4,11 @@ Azure Diagram MCP Server is a [Model Context Protocol](https://modelcontextproto
 
 Generate Azure architecture diagrams, sequence diagrams, flow charts, class diagrams, Kubernetes diagrams, and more — all from natural language via your AI assistant.
 
-## Prerequisites
+## Step 1 — Install Prerequisites
 
 - **Python 3.12+** — Install via [python.org](https://www.python.org/downloads/) or `uv python install 3.12`
-- **Graphviz** — Install from [graphviz.org](https://www.graphviz.org/) or via your package manager:
+- **uv** (recommended) — Install from [Astral](https://docs.astral.sh/uv/getting-started/installation/)
+- **Graphviz** (**required**) — Install from [graphviz.org](https://www.graphviz.org/) or via your package manager:
 
 ::: code-group
 ```sh [macOS]
@@ -21,23 +22,23 @@ choco install graphviz
 ```
 :::
 
-- **uv** (recommended) — Install from [Astral](https://docs.astral.sh/uv/getting-started/installation/)
+::: warning Graphviz is required
+Without Graphviz installed, the MCP server will fail to start. Verify it's installed by running `dot -V`.
+:::
 
-## Quick Install
+## Step 2 — Verify the Server Starts
 
-The fastest way to get started is with `uvx`, which requires no separate install step:
+Run the server directly to confirm your environment is set up correctly:
 
 ```sh
 uvx microsoft.azure-diagram-mcp-server
 ```
 
-Or install with pip:
+You should see the server start and wait for MCP connections. Press **Ctrl+C** to stop it. If it crashes, check that Graphviz is installed (`dot -V`).
 
-```sh
-pip install microsoft.azure-diagram-mcp-server
-```
+## Step 3 — Connect to Your AI Host
 
-## Configure Your MCP Client
+Pick **one** of the methods below to register the server with your AI host.
 
 ### VS Code
 
@@ -58,35 +59,45 @@ Add to your VS Code `settings.json`:
 
 ### Copilot CLI
 
-Start a Copilot CLI session and use the `/mcp add` slash command:
+1. Start a Copilot CLI session:
 
-```
-copilot
-> /mcp add
-```
+   ```sh
+   copilot
+   ```
 
-Fill in the server details (use Tab to navigate):
+2. Inside the session, run the slash command:
 
-| Field | Value |
-|-------|-------|
-| **Name** | `azure-diagram` |
-| **Command** | `uvx` |
-| **Args** | `microsoft.azure-diagram-mcp-server` |
+   ```
+   /mcp add
+   ```
 
-Press **Ctrl+S** to save. Or add directly to `~/.copilot/mcp-config.json`:
+3. Fill in the form (use **Tab** to move between fields):
+
+   | Field | Value |
+   |-------|-------|
+   | **Name** | `azure-diagram` |
+   | **Type** | `Local` |
+   | **Command** | `uvx microsoft.azure-diagram-mcp-server` |
+
+4. Press **Ctrl+S** to save.
+
+5. Verify with `/mcp show azure-diagram` — status should show **✓ Connected**.
+
+::: tip Manual config
+The config is saved to `~/.copilot/mcp-config.json`. You can also edit that file directly:
 
 ```json
 {
   "servers": {
     "azure-diagram": {
       "type": "local",
-      "command": "uvx",
-      "args": ["microsoft.azure-diagram-mcp-server"],
+      "command": "uvx microsoft.azure-diagram-mcp-server",
       "tools": ["*"]
     }
   }
 }
 ```
+:::
 
 ## Your First Diagram
 

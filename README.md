@@ -17,64 +17,83 @@ graph LR
     E -->|Pass| C
 ```
 
-## Prerequisites
+## Getting Started
 
-| Dependency | Install |
-|-----------|---------|
-| **uv** | [astral.sh/uv](https://docs.astral.sh/uv/getting-started/installation/) |
-| **Python 3.12+** | `uv python install 3.12` |
-| **Graphviz** | [graphviz.org](https://www.graphviz.org/) or `brew install graphviz` / `apt install graphviz` |
+### Step 1 — Install Prerequisites
 
-## Installation
+| Dependency | Install | Verify |
+|-----------|---------|--------|
+| **uv** | [astral.sh/uv](https://docs.astral.sh/uv/getting-started/installation/) | `uv --version` |
+| **Python 3.12+** | `uv python install 3.12` | `python3 --version` |
+| **Graphviz** | `brew install graphviz` / `apt install graphviz` / [graphviz.org](https://www.graphviz.org/) | `dot -V` |
 
-### VS Code (one-click)
+> **⚠️ Graphviz is required.** Without it the MCP server will fail to start. Verify with `dot -V` before proceeding.
+
+### Step 2 — Verify the Server Starts
+
+Run the server directly to confirm everything works:
+
+```bash
+uvx microsoft.azure-diagram-mcp-server
+```
+
+You should see the server start and wait for MCP connections. Press `Ctrl+C` to stop it. If it crashes, check that Graphviz is installed (`dot -V`).
+
+### Step 3 — Connect to Your AI Host
+
+Pick **one** of the methods below to register the server with your AI host.
+
+#### Copilot CLI
+
+1. Start a Copilot CLI session:
+
+   ```bash
+   copilot
+   ```
+
+2. Inside the session, run the slash command:
+
+   ```
+   /mcp add
+   ```
+
+3. Fill in the form (use **Tab** to move between fields):
+
+   | Field | Value |
+   |-------|-------|
+   | **Name** | `azure-diagram` |
+   | **Type** | `Local` |
+   | **Command** | `uvx microsoft.azure-diagram-mcp-server` |
+
+4. Press **Ctrl+S** to save.
+
+5. Verify with `/mcp show azure-diagram` — status should show **✓ Connected**.
+
+> The config is saved to `~/.copilot/mcp-config.json`. You can also edit that file directly:
+>
+> ```json
+> {
+>   "servers": {
+>     "azure-diagram": {
+>       "type": "local",
+>       "command": "uvx microsoft.azure-diagram-mcp-server",
+>       "tools": ["*"]
+>     }
+>   }
+> }
+> ```
+
+#### VS Code (one-click)
 
 [![Install on VS Code](https://img.shields.io/badge/Install_on-VS_Code-007ACC?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=Azure%20Diagram%20MCP%20Server&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22microsoft.azure-diagram-mcp-server%22%5D%2C%22env%22%3A%7B%22FASTMCP_LOG_LEVEL%22%3A%22ERROR%22%7D%7D)
 
-### Copilot CLI
-
-Start a Copilot CLI session and use the `/mcp add` slash command:
-
-```
-copilot
-> /mcp add
-```
-
-Then fill in the server details using Tab to navigate between fields:
-
-| Field | Value |
-|-------|-------|
-| **Name** | `azure-diagram` |
-| **Type** | `local` (stdio) |
-| **Command** | `uvx` |
-| **Args** | `microsoft.azure-diagram-mcp-server` |
-
-Press **Ctrl+S** to save. The server is stored in `~/.copilot/mcp-config.json`.
-
-Alternatively, add it directly to `~/.copilot/mcp-config.json`:
-
-```json
-{
-  "servers": {
-    "azure-diagram": {
-      "type": "local",
-      "command": "uvx",
-      "args": ["microsoft.azure-diagram-mcp-server"],
-      "tools": ["*"]
-    }
-  }
-}
-```
-
-### Manual Configuration
-
-Add to your VS Code `settings.json`:
+Or add manually to your VS Code `settings.json`:
 
 ```json
 {
   "mcp": {
     "servers": {
-      "microsoft.azure-diagram-mcp-server": {
+      "azure-diagram": {
         "command": "uvx",
         "args": ["microsoft.azure-diagram-mcp-server"],
         "env": {
@@ -86,7 +105,7 @@ Add to your VS Code `settings.json`:
 }
 ```
 
-### Docker
+#### Docker
 
 ```bash
 docker build -t microsoft/azure-diagram-mcp-server .
@@ -96,7 +115,7 @@ docker build -t microsoft/azure-diagram-mcp-server .
 {
   "mcp": {
     "servers": {
-      "microsoft.azure-diagram-mcp-server": {
+      "azure-diagram": {
         "command": "docker",
         "args": ["run", "--rm", "-i", "--env", "FASTMCP_LOG_LEVEL=ERROR",
                  "microsoft/azure-diagram-mcp-server:latest"]
