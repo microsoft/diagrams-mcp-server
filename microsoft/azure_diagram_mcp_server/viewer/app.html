@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<!--
+  Copyright (c) Microsoft Corporation. All rights reserved.
+  Licensed under the MIT License.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Azure Diagram Viewer</title>
+<style>
+  :root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f3f3f3;
+    --bg-toolbar: #f8f8f8;
+    --text-primary: #1a1a1a;
+    --text-secondary: #616161;
+    --border-color: #e0e0e0;
+    --accent: #0078d4;
+    --accent-hover: #106ebe;
+    --btn-bg: #ffffff;
+    --btn-hover: #f0f0f0;
+    --shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    --shadow-elevated: 0 4px 16px rgba(0, 0, 0, 0.12);
+    --checkerboard-a: #f5f5f5;
+    --checkerboard-b: #e8e8e8;
+    --error-bg: #fde7e9;
+    --error-text: #a80000;
+    --error-border: #f1bbbc;
+  }
+
+  [data-theme="dark"] {
+    --bg-primary: #1e1e1e;
+    --bg-secondary: #252526;
+    --bg-toolbar: #2d2d2d;
+    --text-primary: #cccccc;
+    --text-secondary: #9d9d9d;
+    --border-color: #3e3e3e;
+    --accent: #4fc3f7;
+    --accent-hover: #29b6f6;
+    --btn-bg: #333333;
+    --btn-hover: #3e3e3e;
+    --shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
+    --shadow-elevated: 0 4px 16px rgba(0, 0, 0, 0.4);
+    --checkerboard-a: #262626;
+    --checkerboard-b: #1e1e1e;
+    --error-bg: #442726;
+    --error-text: #f48771;
+    --error-border: #5c2d2d;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+      Ubuntu, Cantarell, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    transition: background-color 0.2s, color 0.2s;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    background: var(--bg-toolbar);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
+    z-index: 10;
+    flex-shrink: 0;
+    transition: background-color 0.2s, border-color 0.2s;
+  }
+
+  .toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .toolbar-separator {
+    width: 1px;
+    height: 20px;
+    background: var(--border-color);
+    margin: 0 6px;
+  }
+
+  .toolbar-spacer {
+    flex: 1;
+  }
+
+  .toolbar button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--btn-bg);
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+  }
+
+  .toolbar button:hover {
+    background: var(--btn-hover);
+    border-color: var(--accent);
+  }
+
+  .toolbar button:active {
+    transform: scale(0.97);
+  }
+
+  .toolbar button svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+    flex-shrink: 0;
+  }
+
+  .zoom-display {
+    font-size: 12px;
+    color: var(--text-secondary);
+    min-width: 44px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    user-select: none;
+  }
+
+  .canvas-container {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    cursor: grab;
+    background-color: var(--bg-secondary);
+    background-image:
+      linear-gradient(45deg, var(--checkerboard-a) 25%, transparent 25%),
+      linear-gradient(-45deg, var(--checkerboard-a) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, var(--checkerboard-a) 75%),
+      linear-gradient(-45deg, transparent 75%, var(--checkerboard-a) 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  }
+
+  .canvas-container:active {
+    cursor: grabbing;
+  }
+
+  .canvas-wrapper {
+    position: absolute;
+    transform-origin: 0 0;
+    transition: none;
+  }
+
+  .canvas-wrapper.animating {
+    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  #diagram-image {
+    display: block;
+    max-width: none;
+    box-shadow: var(--shadow-elevated);
+    border-radius: 4px;
+    background: white;
+  }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    padding: 4px 12px;
+    background: var(--bg-toolbar);
+    border-top: 1px solid var(--border-color);
+    font-size: 11px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+    gap: 12px;
+    transition: background-color 0.2s, border-color 0.2s;
+  }
+
+  .status-bar .status-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .status-bar .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #4caf50;
+    flex-shrink: 0;
+  }
+
+  .status-bar .status-dot.error {
+    background: #f44336;
+  }
+
+  /* Loading State */
+  .state-loading,
+  .state-error,
+  .state-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 5;
+    background: var(--bg-secondary);
+  }
+
+  .state-loading .spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .state-loading p,
+  .state-empty p {
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+
+  .state-error {
+    padding: 20px;
+  }
+
+  .error-box {
+    max-width: 480px;
+    padding: 16px 20px;
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
+    border-radius: 6px;
+    color: var(--error-text);
+    font-size: 13px;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+
+  .error-box .error-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+    font-size: 14px;
+  }
+
+  .state-empty svg {
+    width: 48px;
+    height: 48px;
+    fill: var(--text-secondary);
+    opacity: 0.5;
+  }
+
+  .hidden {
+    display: none !important;
+  }
+</style>
+</head>
+<body data-theme="light">
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <button id="btn-zoom-out" title="Zoom Out">
+        <svg viewBox="0 0 16 16"><path d="M3 8a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9A.5.5 0 0 1 3 8z"/></svg>
+      </button>
+      <span class="zoom-display" id="zoom-display">100%</span>
+      <button id="btn-zoom-in" title="Zoom In">
+        <svg viewBox="0 0 16 16"><path d="M8 3a.5.5 0 0 1 .5.5v4h4a.5.5 0 0 1 0 1h-4v4a.5.5 0 0 1-1 0v-4h-4a.5.5 0 0 1 0-1h4v-4A.5.5 0 0 1 8 3z"/></svg>
+      </button>
+    </div>
+    <div class="toolbar-separator"></div>
+    <button id="btn-fit" title="Fit to View">
+      <svg viewBox="0 0 16 16"><path d="M2 2h4v1H3v3H2V2zm8 0h4v4h-1V3h-3V2zM3 10v3h3v1H2v-4h1zm10 0v4h-4v-1h3v-3h1z"/></svg>
+      Fit
+    </button>
+    <div class="toolbar-spacer"></div>
+    <button id="btn-download" title="Download PNG">
+      <svg viewBox="0 0 16 16"><path d="M8 12l-4-4h2.5V2h3v6H12L8 12zm-6 2h12v1H2v-1z"/></svg>
+      Download
+    </button>
+    <div class="toolbar-separator"></div>
+    <button id="btn-theme" title="Toggle Theme">
+      <svg id="icon-sun" viewBox="0 0 16 16"><path d="M8 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0v-1A.5.5 0 0 1 8 1zm0 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm6.5-2.5a.5.5 0 0 1 0-1h1a.5.5 0 0 1 0 1h-1zm-13 0a.5.5 0 0 1 0-1h1a.5.5 0 0 1 0 1h-1zm10.657-5.657a.5.5 0 0 1 0 .707l-.707.707a.5.5 0 1 1-.707-.707l.707-.707a.5.5 0 0 1 .707 0zM4.757 4.757a.5.5 0 0 1-.707 0l-.707-.707a.5.5 0 0 1 .707-.707l.707.707a.5.5 0 0 1 0 .707zM8 13a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0v-1A.5.5 0 0 1 8 13zm3.536-1.464a.5.5 0 0 1 .707 0l.707.707a.5.5 0 0 1-.707.707l-.707-.707a.5.5 0 0 1 0-.707zm-8.486.707a.5.5 0 0 1 0-.707l.707-.707a.5.5 0 0 1 .707.707l-.707.707a.5.5 0 0 1-.707 0z"/></svg>
+      <svg id="icon-moon" class="hidden" viewBox="0 0 16 16"><path d="M6 1a5 5 0 0 0 3.8 10.7A7 7 0 0 1 6 1z"/></svg>
+    </button>
+  </div>
+
+  <!-- Canvas -->
+  <div class="canvas-container" id="canvas-container">
+    <!-- Loading State -->
+    <div class="state-loading" id="state-loading">
+      <div class="spinner"></div>
+      <p>Waiting for diagram…</p>
+    </div>
+
+    <!-- Empty State -->
+    <div class="state-empty hidden" id="state-empty">
+      <svg viewBox="0 0 16 16"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM10 4a1 1 0 0 0 1 1h3L10 1v3zm-2 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>
+      <p>No diagram to display</p>
+    </div>
+
+    <!-- Error State -->
+    <div class="state-error hidden" id="state-error">
+      <div class="error-box">
+        <div class="error-title">Diagram Generation Failed</div>
+        <div id="error-message"></div>
+      </div>
+    </div>
+
+    <!-- Diagram Canvas -->
+    <div class="canvas-wrapper" id="canvas-wrapper">
+      <img id="diagram-image" class="hidden" alt="Azure Architecture Diagram" />
+    </div>
+  </div>
+
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <div class="status-item">
+      <span class="status-dot" id="status-dot"></span>
+      <span id="status-text">Ready</span>
+    </div>
+    <div class="toolbar-spacer"></div>
+    <span id="status-filename"></span>
+  </div>
+
+  <script type="module">
+    import { App } from 'https://esm.sh/@modelcontextprotocol/ext-apps';
+
+    // State
+    let scale = 1;
+    let panX = 0;
+    let panY = 0;
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let currentImageData = null;
+    let currentFilename = 'diagram.png';
+
+    const MIN_SCALE = 0.1;
+    const MAX_SCALE = 10;
+    const ZOOM_STEP = 0.15;
+
+    // Elements
+    const container = document.getElementById('canvas-container');
+    const wrapper = document.getElementById('canvas-wrapper');
+    const img = document.getElementById('diagram-image');
+    const stateLoading = document.getElementById('state-loading');
+    const stateEmpty = document.getElementById('state-empty');
+    const stateError = document.getElementById('state-error');
+    const errorMessage = document.getElementById('error-message');
+    const zoomDisplay = document.getElementById('zoom-display');
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const statusFilename = document.getElementById('status-filename');
+
+    function updateTransform() {
+      wrapper.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+      zoomDisplay.textContent = `${Math.round(scale * 100)}%`;
+    }
+
+    function fitToView() {
+      if (!img.naturalWidth || !img.naturalHeight) return;
+      const cw = container.clientWidth;
+      const ch = container.clientHeight;
+      const iw = img.naturalWidth;
+      const ih = img.naturalHeight;
+      const padding = 40;
+      const scaleX = (cw - padding * 2) / iw;
+      const scaleY = (ch - padding * 2) / ih;
+      scale = Math.min(scaleX, scaleY, 1);
+      panX = (cw - iw * scale) / 2;
+      panY = (ch - ih * scale) / 2;
+      wrapper.classList.add('animating');
+      updateTransform();
+      setTimeout(() => wrapper.classList.remove('animating'), 320);
+    }
+
+    function zoomBy(delta, cx, cy) {
+      const prevScale = scale;
+      scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * (1 + delta)));
+      if (cx !== undefined && cy !== undefined) {
+        panX = cx - (cx - panX) * (scale / prevScale);
+        panY = cy - (cy - panY) * (scale / prevScale);
+      }
+      updateTransform();
+    }
+
+    function showState(state, message) {
+      stateLoading.classList.add('hidden');
+      stateEmpty.classList.add('hidden');
+      stateError.classList.add('hidden');
+      img.classList.add('hidden');
+
+      if (state === 'loading') {
+        stateLoading.classList.remove('hidden');
+        statusDot.className = 'status-dot';
+        statusText.textContent = 'Generating…';
+      } else if (state === 'error') {
+        stateError.classList.remove('hidden');
+        errorMessage.textContent = message || 'An unknown error occurred.';
+        statusDot.className = 'status-dot error';
+        statusText.textContent = 'Error';
+      } else if (state === 'empty') {
+        stateEmpty.classList.remove('hidden');
+        statusDot.className = 'status-dot';
+        statusText.textContent = 'Ready';
+      } else if (state === 'diagram') {
+        img.classList.remove('hidden');
+        statusDot.className = 'status-dot';
+        statusText.textContent = 'Diagram loaded';
+      }
+    }
+
+    function showDiagram(data) {
+      if (!data) {
+        showState('empty');
+        return;
+      }
+      if (data.status === 'error') {
+        showState('error', data.message);
+        return;
+      }
+      if (!data.imageData) {
+        showState('empty');
+        statusText.textContent = data.message || 'No image data';
+        return;
+      }
+
+      currentImageData = data.imageData;
+      if (data.path) {
+        const parts = data.path.replace(/\\/g, '/').split('/');
+        currentFilename = parts[parts.length - 1] || 'diagram.png';
+        statusFilename.textContent = data.path;
+      }
+
+      img.onload = () => {
+        showState('diagram');
+        fitToView();
+      };
+      img.src = `data:image/png;base64,${data.imageData}`;
+    }
+
+    // Pan: mouse events
+    container.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      isDragging = true;
+      dragStartX = e.clientX - panX;
+      dragStartY = e.clientY - panY;
+      container.style.cursor = 'grabbing';
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      panX = e.clientX - dragStartX;
+      panY = e.clientY - dragStartY;
+      updateTransform();
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDragging = false;
+      container.style.cursor = 'grab';
+    });
+
+    // Zoom: wheel
+    container.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const rect = container.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      const delta = e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
+      zoomBy(delta, cx, cy);
+    }, { passive: false });
+
+    // Toolbar buttons
+    document.getElementById('btn-zoom-in').addEventListener('click', () => {
+      const rect = container.getBoundingClientRect();
+      zoomBy(ZOOM_STEP, rect.width / 2, rect.height / 2);
+    });
+
+    document.getElementById('btn-zoom-out').addEventListener('click', () => {
+      const rect = container.getBoundingClientRect();
+      zoomBy(-ZOOM_STEP, rect.width / 2, rect.height / 2);
+    });
+
+    document.getElementById('btn-fit').addEventListener('click', fitToView);
+
+    document.getElementById('btn-download').addEventListener('click', () => {
+      if (!currentImageData) return;
+      const a = document.createElement('a');
+      a.href = `data:image/png;base64,${currentImageData}`;
+      a.download = currentFilename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
+
+    document.getElementById('btn-theme').addEventListener('click', () => {
+      const body = document.body;
+      const isDark = body.getAttribute('data-theme') === 'dark';
+      body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+      document.getElementById('icon-sun').classList.toggle('hidden', !isDark);
+      document.getElementById('icon-moon').classList.toggle('hidden', isDark);
+    });
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '=' || e.key === '+') {
+        e.preventDefault();
+        const rect = container.getBoundingClientRect();
+        zoomBy(ZOOM_STEP, rect.width / 2, rect.height / 2);
+      } else if (e.key === '-') {
+        e.preventDefault();
+        const rect = container.getBoundingClientRect();
+        zoomBy(-ZOOM_STEP, rect.width / 2, rect.height / 2);
+      } else if (e.key === '0') {
+        e.preventDefault();
+        fitToView();
+      }
+    });
+
+    // Resize handler
+    window.addEventListener('resize', () => {
+      if (!img.classList.contains('hidden')) fitToView();
+    });
+
+    // MCP App integration
+    const app = new App({ name: 'Diagram Viewer', version: '1.0.0' });
+
+    app.ontoolresult = (result) => {
+      const data = result.structuredContent;
+      showDiagram(data);
+    };
+
+    // Detect host theme preference
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.body.setAttribute('data-theme', 'dark');
+      document.getElementById('icon-sun').classList.add('hidden');
+      document.getElementById('icon-moon').classList.remove('hidden');
+    }
+
+    app.connect();
+  </script>
+</body>
+</html>

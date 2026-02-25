@@ -1,0 +1,129 @@
+[project]
+name = "microsoft.azure-diagram-mcp-server"
+version = "0.1.0"
+description = "An MCP server that generates professional diagrams using the Python diagrams package DSL, with first-class Azure support"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "bandit>=1.8.6",
+    "diagrams>=0.24.4",
+    "github-copilot-sdk>=0.1.0",
+    "mcp[cli]>=1.23.0",
+    "pydantic>=2.12.2",
+    "sarif-om>=1.0.4",
+    "setuptools>=80.9.0",
+]
+license = { text = "MIT" }
+license-files = ["LICENSE"]
+
+authors = [
+    { name = "Microsoft Corporation" },
+]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+[project.scripts]
+"microsoft.azure-diagram-mcp-server" = "microsoft.azure_diagram_mcp_server.server:main"
+"microsoft.azure-diagram-copilot" = "microsoft.azure_diagram_mcp_server.copilot_client:main"
+
+[project.urls]
+Homepage = "https://github.com/microsoft/diagrams-mcp-server"
+Documentation = "https://microsoft.github.io/diagrams-mcp-server/"
+Source = "https://github.com/microsoft/diagrams-mcp-server"
+"Bug Tracker" = "https://github.com/microsoft/diagrams-mcp-server/issues"
+Changelog = "https://github.com/microsoft/diagrams-mcp-server/blob/main/CHANGELOG.md"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.406",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.14.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["microsoft"]
+
+[tool.ruff]
+line-length = 99
+extend-include = ["*.ipynb"]
+exclude = [
+    ".venv",
+    "**/__pycache__",
+    "**/node_modules",
+    "**/dist",
+    "**/build",
+]
+force-exclude = true
+
+[tool.ruff.lint]
+exclude = ["__init__.py"]
+select = ["C", "D", "E", "F", "I", "W"]
+ignore = ["C901", "E501", "E741", "F402", "F823", "D100", "D106"]
+
+[tool.ruff.lint.isort]
+lines-after-imports = 2
+no-sections = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+
+[tool.pyright]
+include = ["microsoft", "tests"]
+exclude = [
+    "**/__pycache__",
+    "**/.venv",
+    "**/node_modules",
+    "**/dist",
+    "**/build",
+]
+typeCheckingMode = "basic"
+reportMissingImports = false
+reportUnusedExpression = false
+reportArgumentType = false
+reportAttributeAccessIssue = false
+reportPrivateUsage = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+reportGeneralTypeIssues = false
+
+[tool.pytest.ini_options]
+testpaths = "tests"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["asyncio: mark a test as an asyncio coroutine"]
+filterwarnings = [
+    "ignore::DeprecationWarning:ast",
+    "ignore:ast.Str is deprecated:DeprecationWarning",
+    "ignore:ast.Num is deprecated:DeprecationWarning",
+    "ignore:ast.NameConstant is deprecated:DeprecationWarning",
+    "ignore:ast.Ellipsis is deprecated:DeprecationWarning",
+    "ignore:Attribute s is deprecated:DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["microsoft"]
+
+[tool.bandit]
+skips = ["B102"]
+exclude_dirs = ["venv", "tests"]
+per_file_skips = { "microsoft/azure_diagram_mcp_server/diagram_tools.py" = ["B102"] }
