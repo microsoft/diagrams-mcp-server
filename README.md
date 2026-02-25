@@ -1,18 +1,29 @@
 # Azure Diagram MCP Server
 
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](https://github.com/microsoft/diagrams-mcp-server/actions)
+[![Tests](https://img.shields.io/badge/tests-140_passing-brightgreen.svg)](https://github.com/microsoft/diagrams-mcp-server/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![MCP](https://img.shields.io/badge/MCP-server-purple.svg)](https://modelcontextprotocol.io/)
+[![Copilot SDK](https://img.shields.io/badge/Copilot_SDK-integrated-blue.svg)](https://github.com/github/copilot-sdk)
 
-Model Context Protocol (MCP) server for generating professional diagrams using the Python [diagrams](https://diagrams.mingrammer.com/) package DSL — with first-class support for Azure architecture diagrams.
+An [MCP](https://modelcontextprotocol.io/) server for generating professional infrastructure diagrams using the Python [diagrams](https://diagrams.mingrammer.com/) DSL — with first-class Azure support and [GitHub Copilot SDK](https://github.com/github/copilot-sdk) integration for natural language diagram generation.
 
-Generate Azure architecture diagrams, sequence diagrams, flow charts, class diagrams, Kubernetes diagrams, and more — all from natural language via your AI assistant.
+```mermaid
+graph LR
+    A[AI Assistant] -->|Natural Language| B[MCP Server]
+    B -->|Python DSL| C[Diagrams + Graphviz]
+    C -->|PNG| D[Interactive Viewer]
+    B -->|Security Scan| E[AST + Bandit]
+    E -->|Pass| C
+```
 
 ## Prerequisites
 
-1. Install `uv` from [Astral](https://docs.astral.sh/uv/getting-started/installation/)
-2. Install Python using `uv python install 3.12`
-3. Install [GraphViz](https://www.graphviz.org/)
+| Dependency | Install |
+|-----------|---------|
+| **uv** | [astral.sh/uv](https://docs.astral.sh/uv/getting-started/installation/) |
+| **Python 3.12+** | `uv python install 3.12` |
+| **Graphviz** | [graphviz.org](https://www.graphviz.org/) or `brew install graphviz` / `apt install graphviz` |
 
 ## Installation
 
@@ -40,18 +51,17 @@ Add to your MCP client configuration (e.g., VS Code `settings.json`, Claude Desk
 
 ### Docker
 
-After building with `docker build -t microsoft/azure-diagram-mcp-server .`:
+```bash
+docker build -t microsoft/azure-diagram-mcp-server .
+```
 
 ```json
 {
   "mcpServers": {
     "microsoft.azure-diagram-mcp-server": {
       "command": "docker",
-      "args": [
-        "run", "--rm", "--interactive",
-        "--env", "FASTMCP_LOG_LEVEL=ERROR",
-        "microsoft/azure-diagram-mcp-server:latest"
-      ]
+      "args": ["run", "--rm", "-i", "--env", "FASTMCP_LOG_LEVEL=ERROR",
+               "microsoft/azure-diagram-mcp-server:latest"]
     }
   }
 }
@@ -61,11 +71,71 @@ After building with `docker build -t microsoft/azure-diagram-mcp-server .`:
 
 | Feature | Description |
 |---------|-------------|
-| **Azure Architecture Diagrams** | Full support for Azure services — App Service, Functions, Cosmos DB, AKS, and 100+ more |
-| **Multi-Cloud Support** | Also supports AWS, GCP, Kubernetes, and on-premises diagrams |
-| **Multiple Diagram Types** | Architecture, sequence, flow, class, and custom diagrams |
-| **Security Scanning** | AST + Bandit-powered code scanning before execution |
-| **Interactive Viewer** | MCP App integration for interactive diagram viewing with pan, zoom, and download |
+| ☁️ **Azure-First** | 100+ Azure service icons — App Service, Functions, Cosmos DB, AKS, and more |
+| 🌐 **Multi-Cloud** | AWS, GCP, Kubernetes, on-premises, and custom icon support |
+| 📊 **Multiple Types** | Architecture, sequence, flow, class, K8s, and custom diagrams |
+| 🔒 **Security Scanning** | AST + Bandit code analysis before every execution |
+| 🖼️ **Interactive Viewer** | MCP Apps viewer with pan, zoom, download, and dark/light theme |
+| 🤖 **Copilot SDK** | Natural language diagram generation via GitHub Copilot SDK |
+
+## Architecture
+
+```mermaid
+graph TB
+    subgraph "AI Host"
+        VS[VS Code Copilot]
+        CD[Claude Desktop]
+        CU[Cursor]
+    end
+
+    subgraph "MCP Server"
+        S[server.py<br/>FastMCP]
+        DT[diagram_tools.py<br/>Generation + Examples]
+        SC[scanner.py<br/>AST + Bandit]
+        V[viewer/app.html<br/>MCP Apps Viewer]
+    end
+
+    subgraph "Copilot SDK Layer"
+        CC[copilot_client.py<br/>DiagramCopilotClient]
+        AG[Custom Agent<br/>azure-diagram-architect]
+    end
+
+    VS & CD & CU -->|MCP stdio| S
+    CC -->|MCP local| S
+    AG --> CC
+    S --> DT
+    S --> V
+    DT --> SC
+    SC -->|Pass| DT
+    DT -->|Python DSL| GV[Graphviz → PNG]
+```
+
+## MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `generate_diagram` | Execute Python diagram code with security scanning and timeout. Pre-imports all providers — just start with `with Diagram(...)`. |
+| `refresh_diagram` | Regenerate a diagram from updated code (app-only, used by the interactive viewer). |
+| `get_diagram_examples` | Get example code by type: `azure`, `sequence`, `flow`, `class`, `k8s`, `onprem`, `custom`, or `all`. |
+| `list_icons` | Discover available icons by provider and service. Filter with `provider_filter` and `service_filter`. |
+
+### Recommended Workflow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant LLM
+    participant MCP as MCP Server
+
+    User->>LLM: "Create an Azure web app diagram"
+    LLM->>MCP: list_icons(provider_filter="azure")
+    MCP-->>LLM: Available icons
+    LLM->>MCP: get_diagram_examples(diagram_type="azure")
+    MCP-->>LLM: Example code
+    LLM->>MCP: generate_diagram(code="...")
+    MCP-->>LLM: PNG image + viewer
+    LLM-->>User: Diagram rendered
+```
 
 ## Quick Example
 
@@ -85,28 +155,22 @@ with Diagram("Azure Web Architecture", show=False):
     gateway >> functions >> db
 ```
 
-## MCP Tools
-
-### `generate_diagram`
-Generate a diagram from Python code using the diagrams package DSL. The runtime pre-imports all diagram providers — just start with `with Diagram(...)`.
-
-### `get_diagram_examples`
-Get example code for different diagram types: `azure`, `sequence`, `flow`, `class`, `k8s`, `onprem`, `custom`, or `all`.
-
-### `list_icons`
-Discover available icons organized by provider and service. Call without filters to see providers, then drill down.
-
 ## Copilot SDK Integration
 
-The server includes a [GitHub Copilot SDK](https://github.com/github/copilot-sdk) client that provides a natural language interface to the diagram tools. Instead of manually writing diagram code, describe what you want and the Copilot-powered architect will generate it.
+The server includes a [GitHub Copilot SDK](https://github.com/github/copilot-sdk) client that provides a natural language interface to diagram generation — describe what you want and the Copilot-powered architect generates it.
+
+```mermaid
+graph LR
+    U[User Prompt] --> CC[DiagramCopilotClient]
+    CC -->|Creates Session| CS[CopilotClient]
+    CS -->|Connects| MCP[Diagram MCP Server]
+    CS -->|Uses| AG[azure-diagram-architect<br/>Custom Agent]
+    MCP -->|Returns| IMG[PNG Diagram]
+```
 
 ### Interactive CLI
 
 ```bash
-# Run the interactive diagram copilot
-microsoft.azure-diagram-copilot
-
-# Or with uv
 uv run microsoft.azure-diagram-copilot
 ```
 
@@ -118,11 +182,10 @@ from microsoft.azure_diagram_mcp_server.copilot_client import DiagramCopilotClie
 
 async def main():
     async with DiagramCopilotClient(model="gpt-4.1") as client:
-        # Stream response deltas to stdout
         client.on_delta(lambda delta: print(delta, end="", flush=True))
         client.on_idle(lambda: print())
 
-        response = await client.generate(
+        await client.generate(
             "Create a 3-tier Azure architecture with App Gateway, "
             "App Service, and Cosmos DB"
         )
@@ -132,29 +195,27 @@ asyncio.run(main())
 
 ### BYOK (Bring Your Own Key)
 
-Configure a custom LLM provider via environment variables — no Copilot subscription required:
+Use your own LLM provider — no Copilot subscription required:
+
+| Variable | Description |
+|----------|-------------|
+| `DIAGRAM_COPILOT_PROVIDER_TYPE` | `openai`, `azure`, or `anthropic` |
+| `DIAGRAM_COPILOT_BASE_URL` | API endpoint URL |
+| `DIAGRAM_COPILOT_API_KEY` | API key |
+| `DIAGRAM_COPILOT_WIRE_API` | `completions` or `responses` |
+| `DIAGRAM_COPILOT_MODEL` | Model override (default: `gpt-4.1`) |
+| `DIAGRAM_COPILOT_AZURE_API_VERSION` | Azure API version (default: `2024-10-21`) |
 
 ```bash
-# Azure OpenAI
-export DIAGRAM_COPILOT_PROVIDER_TYPE=openai
-export DIAGRAM_COPILOT_BASE_URL=https://your-resource.openai.azure.com/openai/v1/
-export DIAGRAM_COPILOT_API_KEY=your-api-key
-export DIAGRAM_COPILOT_WIRE_API=responses
-
-# Or native Azure endpoint
 export DIAGRAM_COPILOT_PROVIDER_TYPE=azure
 export DIAGRAM_COPILOT_BASE_URL=https://your-resource.openai.azure.com
 export DIAGRAM_COPILOT_API_KEY=your-api-key
-export DIAGRAM_COPILOT_AZURE_API_VERSION=2024-10-21
-
-# Override model
-export DIAGRAM_COPILOT_MODEL=gpt-4.1
+uv run microsoft.azure-diagram-copilot
 ```
 
 ### Resumable Sessions
 
 ```python
-# Create a named session
 client = DiagramCopilotClient(session_id="my-project-diagrams")
 await client.start()
 await client.generate("Create an Azure web app diagram")
@@ -167,25 +228,32 @@ await client.stop()
 
 ## Development
 
-### Setup
 ```bash
-uv pip install -e ".[dev]"
+# Setup
+uv sync --group dev
+
+# Test (140 tests, 9 skip without Graphviz)
+uv run pytest tests/ -v
+
+# Lint + format
+uv run ruff check microsoft/ tests/
+uv run ruff format --check microsoft/ tests/
+
+# Type check
+uv run pyright
+
+# Coverage
+uv run pytest --cov=microsoft --cov-report=term-missing tests/
 ```
 
-### Testing
-```bash
-pytest -xvs tests/
-```
+See [AGENTS.md](AGENTS.md) for comprehensive contributor documentation covering architecture, conventions, testing patterns, CI/CD, and the GitHub Pages docs site.
 
-### With Coverage
-```bash
-pytest --cov=microsoft.azure_diagram_mcp_server --cov-report=term-missing tests/
-```
+## Documentation
 
-### Linting
+📖 **[microsoft.github.io/diagrams-mcp-server](https://microsoft.github.io/diagrams-mcp-server/)** — Full documentation built with VitePress, deployed via GitHub Pages.
+
 ```bash
-ruff check .
-ruff format --check .
+cd docs-site && npm install && npm run docs:dev  # Local dev server
 ```
 
 ## License
@@ -194,4 +262,4 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 ## Contributing
 
-This project welcomes contributions and suggestions. Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+This project welcomes contributions and suggestions. See [AGENTS.md](AGENTS.md) for the full development guide.
