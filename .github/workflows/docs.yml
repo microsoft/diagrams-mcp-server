@@ -35,11 +35,15 @@ jobs:
         working-directory: docs-site
         run: npm ci
 
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
       - name: Build docs
         working-directory: docs-site
         run: npm run docs:build
-
-      - uses: actions/configure-pages@v5
+        env:
+          VITEPRESS_BASE: ${{ steps.pages.outputs.base_path }}
 
       - uses: actions/upload-pages-artifact@v3
         with:
