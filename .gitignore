@@ -416,3 +416,39 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+*.whl
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Diagram output
+generated-diagrams/
+
+# VitePress
+docs-site/node_modules/
+docs-site/.vitepress/dist/
+docs-site/.vitepress/cache/
+
+# OS
+.DS_Store
+Thumbs.db
