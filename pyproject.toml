@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "bandit>=1.8.6",
     "diagrams>=0.24.4",
+    "github-copilot-sdk>=0.1.0",
     "mcp[cli]>=1.23.0",
     "pydantic>=2.12.2",
     "sarif-om>=1.0.4",
@@ -29,6 +30,7 @@ classifiers = [
 
 [project.scripts]
 "microsoft.azure-diagram-mcp-server" = "microsoft.azure_diagram_mcp_server.server:main"
+"microsoft.azure-diagram-copilot" = "microsoft.azure_diagram_mcp_server.copilot_client:main"
 
 [project.urls]
 Homepage = "https://github.com/microsoft/diagrams-mcp-server"

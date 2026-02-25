@@ -96,6 +96,75 @@ Get example code for different diagram types: `azure`, `sequence`, `flow`, `clas
 ### `list_icons`
 Discover available icons organized by provider and service. Call without filters to see providers, then drill down.
 
+## Copilot SDK Integration
+
+The server includes a [GitHub Copilot SDK](https://github.com/github/copilot-sdk) client that provides a natural language interface to the diagram tools. Instead of manually writing diagram code, describe what you want and the Copilot-powered architect will generate it.
+
+### Interactive CLI
+
+```bash
+# Run the interactive diagram copilot
+microsoft.azure-diagram-copilot
+
+# Or with uv
+uv run microsoft.azure-diagram-copilot
+```
+
+### Programmatic Usage
+
+```python
+import asyncio
+from microsoft.azure_diagram_mcp_server.copilot_client import DiagramCopilotClient
+
+async def main():
+    async with DiagramCopilotClient(model="gpt-4.1") as client:
+        # Stream response deltas to stdout
+        client.on_delta(lambda delta: print(delta, end="", flush=True))
+        client.on_idle(lambda: print())
+
+        response = await client.generate(
+            "Create a 3-tier Azure architecture with App Gateway, "
+            "App Service, and Cosmos DB"
+        )
+
+asyncio.run(main())
+```
+
+### BYOK (Bring Your Own Key)
+
+Configure a custom LLM provider via environment variables — no Copilot subscription required:
+
+```bash
+# Azure OpenAI
+export DIAGRAM_COPILOT_PROVIDER_TYPE=openai
+export DIAGRAM_COPILOT_BASE_URL=https://your-resource.openai.azure.com/openai/v1/
+export DIAGRAM_COPILOT_API_KEY=your-api-key
+export DIAGRAM_COPILOT_WIRE_API=responses
+
+# Or native Azure endpoint
+export DIAGRAM_COPILOT_PROVIDER_TYPE=azure
+export DIAGRAM_COPILOT_BASE_URL=https://your-resource.openai.azure.com
+export DIAGRAM_COPILOT_API_KEY=your-api-key
+export DIAGRAM_COPILOT_AZURE_API_VERSION=2024-10-21
+
+# Override model
+export DIAGRAM_COPILOT_MODEL=gpt-4.1
+```
+
+### Resumable Sessions
+
+```python
+# Create a named session
+client = DiagramCopilotClient(session_id="my-project-diagrams")
+await client.start()
+await client.generate("Create an Azure web app diagram")
+
+# Resume later
+await client.resume("my-project-diagrams")
+await client.generate("Add a Redis cache to the previous diagram")
+await client.stop()
+```
+
 ## Development
 
 ### Setup
