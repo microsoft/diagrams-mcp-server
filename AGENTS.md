@@ -6,7 +6,7 @@
 
 **Azure Diagram MCP Server** is a Python [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that generates professional infrastructure and architecture diagrams using the [diagrams](https://diagrams.mingrammer.com/) package DSL. It has first-class Azure support and integrates with the [GitHub Copilot SDK](https://github.com/github/copilot-sdk) for natural language diagram generation.
 
-**Key capability:** An AI assistant (VS Code Copilot, Claude Desktop, Cursor) sends a natural language request → the MCP server generates Python diagram code → executes it → returns a PNG image.
+**Key capability:** A user describes a diagram via the GitHub Copilot CLI or VS Code Copilot → the MCP server generates Python diagram code → executes it → returns a PNG image rendered in the MCP Apps viewer.
 
 ---
 
@@ -55,7 +55,7 @@ diagrams-mcp-server/
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  AI Host (VS Code Copilot, Claude Desktop, Cursor)      │
+│  GitHub Copilot (Copilot CLI, VS Code Copilot)          │
 │  ← Natural language: "Create a 3-tier Azure diagram" →  │
 └─────────────┬───────────────────────────────┬───────────┘
               │ MCP Protocol (stdio)          │ Copilot SDK
