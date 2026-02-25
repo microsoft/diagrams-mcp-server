@@ -5,6 +5,7 @@
 
 import base64
 import os
+import sys
 from mcp.server.fastmcp import FastMCP
 from mcp.types import CallToolResult, TextContent
 from microsoft.azure_diagram_mcp_server.diagram_tools import (
@@ -148,6 +149,39 @@ async def mcp_list_diagram_icons(
 
 def main():
     """Run the MCP server with CLI argument support."""
+    if '--help' in sys.argv or '-h' in sys.argv:
+        print('Azure Diagram MCP Server v0.1.0')
+        print()
+        print('An MCP server for generating professional infrastructure diagrams.')
+        print()
+        print('Usage:')
+        print('  This is an MCP stdio server — it communicates via JSON-RPC over')
+        print('  stdin/stdout and is meant to be launched by an MCP client.')
+        print()
+        print('  Copilot CLI:  /mcp add → Command: uvx microsoft.azure-diagram-mcp-server')
+        print('  VS Code:      Add to settings.json under mcp.servers')
+        print()
+        print('  See: https://github.com/microsoft/diagrams-mcp-server#getting-started')
+        sys.exit(0)
+
+    if '--version' in sys.argv or '-v' in sys.argv:
+        print('microsoft.azure-diagram-mcp-server 0.1.0')
+        sys.exit(0)
+
+    if sys.stdin.isatty():
+        print('Azure Diagram MCP Server v0.1.0')
+        print()
+        print('⚠  This is an MCP stdio server — do not run it directly.')
+        print('   It communicates via JSON-RPC over stdin/stdout and must be')
+        print('   launched by an MCP client (Copilot CLI, VS Code, etc).')
+        print()
+        print('Quick setup:')
+        print('  Copilot CLI:  copilot → /mcp add → Command: uvx microsoft.azure-diagram-mcp-server')
+        print('  VS Code:      Add to settings.json under mcp.servers')
+        print()
+        print('Run with --help for more info.')
+        sys.exit(1)
+
     mcp.run()
 
 

@@ -26,15 +26,15 @@ choco install graphviz
 Without Graphviz installed, the MCP server will fail to start. Verify it's installed by running `dot -V`.
 :::
 
-## Step 2 — Verify the Server Starts
+## Step 2 — Verify Installation
 
-Run the server directly to confirm your environment is set up correctly:
+Run the server to confirm your environment is set up correctly:
 
 ```sh
 uvx microsoft.azure-diagram-mcp-server
 ```
 
-You should see the server start and wait for MCP connections. Press **Ctrl+C** to stop it. If it crashes, check that Graphviz is installed (`dot -V`).
+You should see a message confirming the server is installed and ready. The server is an MCP stdio server — it's designed to be launched by an MCP client, not run directly. If it fails to install, check that Graphviz is installed (`dot -V`).
 
 ## Step 3 — Connect to Your AI Host
 
