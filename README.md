@@ -33,9 +33,37 @@ graph LR
 
 ### Copilot CLI
 
-```bash
-# Install and run via the GitHub Copilot CLI
-copilot mcp add microsoft.azure-diagram-mcp-server -- uvx microsoft.azure-diagram-mcp-server
+Start a Copilot CLI session and use the `/mcp add` slash command:
+
+```
+copilot
+> /mcp add
+```
+
+Then fill in the server details using Tab to navigate between fields:
+
+| Field | Value |
+|-------|-------|
+| **Name** | `azure-diagram` |
+| **Type** | `local` (stdio) |
+| **Command** | `uvx` |
+| **Args** | `microsoft.azure-diagram-mcp-server` |
+
+Press **Ctrl+S** to save. The server is stored in `~/.copilot/mcp-config.json`.
+
+Alternatively, add it directly to `~/.copilot/mcp-config.json`:
+
+```json
+{
+  "servers": {
+    "azure-diagram": {
+      "type": "local",
+      "command": "uvx",
+      "args": ["microsoft.azure-diagram-mcp-server"],
+      "tools": ["*"]
+    }
+  }
+}
 ```
 
 ### Manual Configuration

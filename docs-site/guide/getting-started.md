@@ -58,8 +58,34 @@ Add to your VS Code `settings.json`:
 
 ### Copilot CLI
 
-```sh
-copilot mcp add azure-diagram -- uvx microsoft.azure-diagram-mcp-server
+Start a Copilot CLI session and use the `/mcp add` slash command:
+
+```
+copilot
+> /mcp add
+```
+
+Fill in the server details (use Tab to navigate):
+
+| Field | Value |
+|-------|-------|
+| **Name** | `azure-diagram` |
+| **Command** | `uvx` |
+| **Args** | `microsoft.azure-diagram-mcp-server` |
+
+Press **Ctrl+S** to save. Or add directly to `~/.copilot/mcp-config.json`:
+
+```json
+{
+  "servers": {
+    "azure-diagram": {
+      "type": "local",
+      "command": "uvx",
+      "args": ["microsoft.azure-diagram-mcp-server"],
+      "tools": ["*"]
+    }
+  }
+}
 ```
 
 ## Your First Diagram
