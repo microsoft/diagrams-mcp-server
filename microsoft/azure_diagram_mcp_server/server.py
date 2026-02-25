@@ -176,7 +176,9 @@ def main():
         print('   launched by an MCP client (Copilot CLI, VS Code, etc).')
         print()
         print('Quick setup:')
-        print('  Copilot CLI:  copilot → /mcp add → Command: uvx microsoft.azure-diagram-mcp-server')
+        print(
+            '  Copilot CLI:  copilot → /mcp add → Command: uvx microsoft.azure-diagram-mcp-server'
+        )
         print('  VS Code:      Add to settings.json under mcp.servers')
         print()
         print('Run with --help for more info.')
