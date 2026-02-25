@@ -150,7 +150,7 @@ async def mcp_list_diagram_icons(
 def main():
     """Run the MCP server with CLI argument support."""
     if '--help' in sys.argv or '-h' in sys.argv:
-        print('Azure Diagram MCP Server v0.1.0')
+        print('Azure Diagram MCP Server v0.1.1')
         print()
         print('An MCP server for generating professional infrastructure diagrams.')
         print()
@@ -165,11 +165,11 @@ def main():
         sys.exit(0)
 
     if '--version' in sys.argv or '-v' in sys.argv:
-        print('microsoft.azure-diagram-mcp-server 0.1.0')
+        print('microsoft.azure-diagram-mcp-server 0.1.1')
         sys.exit(0)
 
     if sys.stdin.isatty():
-        print('Azure Diagram MCP Server v0.1.0')
+        print('Azure Diagram MCP Server v0.1.1')
         print()
         print('⚠  This is an MCP stdio server — do not run it directly.')
         print('   It communicates via JSON-RPC over stdin/stdout and must be')

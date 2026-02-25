@@ -10,7 +10,7 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_FROZEN=true \
     PIP_NO_CACHE_DIR=1
 
-COPY pyproject.toml ./
+COPY pyproject.toml uv.lock ./
 
 # Install uv and project dependencies
 RUN pip install uv && \
