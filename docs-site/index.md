@@ -23,5 +23,5 @@ features:
     details: AST validation and Bandit security scanning for all generated code. Every diagram is validated before execution to ensure safe code generation.
   - icon: 🔌
     title: MCP Native
-    details: Works seamlessly with VS Code Copilot, Claude Desktop, Cursor, and other MCP hosts. Just configure and start generating diagrams.
+    details: Works seamlessly with VS Code Copilot and the GitHub Copilot CLI. Just configure and start generating diagrams.
 ---

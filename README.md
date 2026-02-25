@@ -12,7 +12,7 @@ An [MCP](https://modelcontextprotocol.io/) server for generating professional in
 graph LR
     A[AI Assistant] -->|Natural Language| B[MCP Server]
     B -->|Python DSL| C[Diagrams + Graphviz]
-    C -->|PNG| D[Interactive Viewer]
+    C -->|PNG| D[MCP Apps Viewer]
     B -->|Security Scan| E[AST + Bandit]
     E -->|Pass| C
 ```
@@ -27,22 +27,31 @@ graph LR
 
 ## Installation
 
-| VS Code | Cursor |
-|:-------:|:------:|
-| [![Install on VS Code](https://img.shields.io/badge/Install_on-VS_Code-007ACC?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=Azure%20Diagram%20MCP%20Server&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22microsoft.azure-diagram-mcp-server%22%5D%2C%22env%22%3A%7B%22FASTMCP_LOG_LEVEL%22%3A%22ERROR%22%7D%7D) | [![Install MCP Server](https://cursor.com/deeplink/mcp-install-light.svg)](https://cursor.com/en/install-mcp?name=microsoft.azure-diagram-mcp-server&config=eyJjb21tYW5kIjoidXZ4IG1pY3Jvc29mdC5henVyZS1kaWFncmFtLW1jcC1zZXJ2ZXIiLCJlbnYiOnsiRkFTVE1DUF9MT0dfTEVWRUwiOiJFUlJPUiJ9fQ==) |
+### VS Code (one-click)
+
+[![Install on VS Code](https://img.shields.io/badge/Install_on-VS_Code-007ACC?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=Azure%20Diagram%20MCP%20Server&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22microsoft.azure-diagram-mcp-server%22%5D%2C%22env%22%3A%7B%22FASTMCP_LOG_LEVEL%22%3A%22ERROR%22%7D%7D)
+
+### Copilot CLI
+
+```bash
+# Install and run via the GitHub Copilot CLI
+copilot mcp add microsoft.azure-diagram-mcp-server -- uvx microsoft.azure-diagram-mcp-server
+```
 
 ### Manual Configuration
 
-Add to your MCP client configuration (e.g., VS Code `settings.json`, Claude Desktop config):
+Add to your VS Code `settings.json`:
 
 ```json
 {
-  "mcpServers": {
-    "microsoft.azure-diagram-mcp-server": {
-      "command": "uvx",
-      "args": ["microsoft.azure-diagram-mcp-server"],
-      "env": {
-        "FASTMCP_LOG_LEVEL": "ERROR"
+  "mcp": {
+    "servers": {
+      "microsoft.azure-diagram-mcp-server": {
+        "command": "uvx",
+        "args": ["microsoft.azure-diagram-mcp-server"],
+        "env": {
+          "FASTMCP_LOG_LEVEL": "ERROR"
+        }
       }
     }
   }
@@ -57,11 +66,13 @@ docker build -t microsoft/azure-diagram-mcp-server .
 
 ```json
 {
-  "mcpServers": {
-    "microsoft.azure-diagram-mcp-server": {
-      "command": "docker",
-      "args": ["run", "--rm", "-i", "--env", "FASTMCP_LOG_LEVEL=ERROR",
-               "microsoft/azure-diagram-mcp-server:latest"]
+  "mcp": {
+    "servers": {
+      "microsoft.azure-diagram-mcp-server": {
+        "command": "docker",
+        "args": ["run", "--rm", "-i", "--env", "FASTMCP_LOG_LEVEL=ERROR",
+                 "microsoft/azure-diagram-mcp-server:latest"]
+      }
     }
   }
 }
@@ -75,17 +86,16 @@ docker build -t microsoft/azure-diagram-mcp-server .
 | 🌐 **Multi-Cloud** | AWS, GCP, Kubernetes, on-premises, and custom icon support |
 | 📊 **Multiple Types** | Architecture, sequence, flow, class, K8s, and custom diagrams |
 | 🔒 **Security Scanning** | AST + Bandit code analysis before every execution |
-| 🖼️ **Interactive Viewer** | MCP Apps viewer with pan, zoom, download, and dark/light theme |
+| 🖼️ **MCP Apps Viewer** | Interactive diagram viewer with pan, zoom, download, and dark/light theme |
 | 🤖 **Copilot SDK** | Natural language diagram generation via GitHub Copilot SDK |
 
 ## Architecture
 
 ```mermaid
 graph TB
-    subgraph "AI Host"
+    subgraph "GitHub Copilot"
+        CLI[Copilot CLI]
         VS[VS Code Copilot]
-        CD[Claude Desktop]
-        CU[Cursor]
     end
 
     subgraph "MCP Server"
@@ -100,7 +110,7 @@ graph TB
         AG[Custom Agent<br/>azure-diagram-architect]
     end
 
-    VS & CD & CU -->|MCP stdio| S
+    CLI & VS -->|MCP stdio| S
     CC -->|MCP local| S
     AG --> CC
     S --> DT
@@ -115,7 +125,7 @@ graph TB
 | Tool | Description |
 |------|-------------|
 | `generate_diagram` | Execute Python diagram code with security scanning and timeout. Pre-imports all providers — just start with `with Diagram(...)`. |
-| `refresh_diagram` | Regenerate a diagram from updated code (app-only, used by the interactive viewer). |
+| `refresh_diagram` | Regenerate a diagram from updated code (app-only, used by the MCP Apps viewer). |
 | `get_diagram_examples` | Get example code by type: `azure`, `sequence`, `flow`, `class`, `k8s`, `onprem`, `custom`, or `all`. |
 | `list_icons` | Discover available icons by provider and service. Filter with `provider_filter` and `service_filter`. |
 
@@ -124,18 +134,51 @@ graph TB
 ```mermaid
 sequenceDiagram
     participant User
-    participant LLM
+    participant Copilot as GitHub Copilot
     participant MCP as MCP Server
+    participant App as MCP Apps Viewer
 
-    User->>LLM: "Create an Azure web app diagram"
-    LLM->>MCP: list_icons(provider_filter="azure")
-    MCP-->>LLM: Available icons
-    LLM->>MCP: get_diagram_examples(diagram_type="azure")
-    MCP-->>LLM: Example code
-    LLM->>MCP: generate_diagram(code="...")
-    MCP-->>LLM: PNG image + viewer
-    LLM-->>User: Diagram rendered
+    User->>Copilot: "Create an Azure web app diagram"
+    Copilot->>MCP: list_icons(provider_filter="azure")
+    MCP-->>Copilot: Available icons
+    Copilot->>MCP: get_diagram_examples(diagram_type="azure")
+    MCP-->>Copilot: Example code
+    Copilot->>MCP: generate_diagram(code="...")
+    MCP-->>Copilot: PNG + structuredContent
+    Copilot->>App: Render diagram in viewer
+    App-->>User: Interactive diagram with pan/zoom
 ```
+
+## MCP Apps Viewer
+
+The server includes an interactive **MCP Apps** viewer that renders diagrams inline in VS Code and the Copilot CLI. When `generate_diagram` returns a result, the viewer is automatically displayed.
+
+```mermaid
+graph LR
+    subgraph "MCP Server"
+        GD[generate_diagram] -->|CallToolResult| SC[structuredContent<br/>status + imageData]
+        SC --> META["_meta.ui.resourceUri<br/>ui://diagram-viewer/app.html"]
+    end
+
+    subgraph "MCP Apps Viewer"
+        META --> V[Interactive Viewer]
+        V --> PAN[Pan & Drag]
+        V --> ZOOM[Zoom In/Out]
+        V --> DL[Download PNG]
+        V --> THEME[Dark/Light Theme]
+        V --> FIT[Fit to View]
+    end
+```
+
+| Feature | Control |
+|---------|---------|
+| **Pan** | Click and drag |
+| **Zoom** | Mouse wheel, `+` / `-` keys |
+| **Fit to view** | `0` key or toolbar button |
+| **Download** | Toolbar download button |
+| **Theme** | Toggle dark/light in toolbar |
+
+The viewer is served as an MCP resource at `ui://diagram-viewer/app.html` and receives the diagram as base64-encoded PNG via `structuredContent.imageData`.
 
 ## Quick Example
 

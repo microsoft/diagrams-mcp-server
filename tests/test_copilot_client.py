@@ -151,6 +151,7 @@ class TestProviderConfig:
         }
         with patch.dict(os.environ, env, clear=True):
             config = _build_provider_config()
+            assert config is not None
             assert config['azure']['apiVersion'] == '2025-01-01'
 
     def test_wire_api_config(self):
@@ -162,6 +163,7 @@ class TestProviderConfig:
         }
         with patch.dict(os.environ, env, clear=True):
             config = _build_provider_config()
+            assert config is not None
             assert config['wireApi'] == 'responses'
 
 

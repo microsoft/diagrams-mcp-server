@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "copilot-sdk": {
+      "source": "microsoft/skills",
+      "sourceType": "github",
+      "computedHash": "aa06b65b8b191c128872561413910cc92d9ab292418a0e451bc61b1579c29b57"
+    }
+  }
+}

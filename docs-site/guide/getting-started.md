@@ -56,24 +56,11 @@ Add to your VS Code `settings.json`:
 }
 ```
 
-### Claude Desktop
+### Copilot CLI
 
-Add to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "azure-diagram": {
-      "command": "uvx",
-      "args": ["microsoft.azure-diagram-mcp-server"]
-    }
-  }
-}
+```sh
+copilot mcp add azure-diagram -- uvx microsoft.azure-diagram-mcp-server
 ```
-
-### Cursor
-
-Use the one-click install button from the [GitHub repository](https://github.com/microsoft/diagrams-mcp-server), or manually configure using the same format as Claude Desktop.
 
 ## Your First Diagram
 

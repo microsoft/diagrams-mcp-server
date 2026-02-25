@@ -40,6 +40,7 @@ class TestMcpGenerateDiagram:
         mock_generate.assert_called_once_with('with Diagram("Test"):', 'test', 60, '/tmp')
         assert isinstance(result, CallToolResult)
         assert result.isError is False
+        assert result.structuredContent is not None
         assert result.structuredContent['status'] == 'success'
         assert result.structuredContent['path'] == '/tmp/diagram.png'
         assert result.structuredContent['message'] == 'Diagram generated successfully'
@@ -62,6 +63,7 @@ class TestMcpGenerateDiagram:
 
         mock_generate.assert_called_once_with('with Diagram("Test"):', None, 90, None)
         assert isinstance(result, CallToolResult)
+        assert result.structuredContent is not None
         assert result.structuredContent['status'] == 'success'
 
     @pytest.mark.asyncio
@@ -234,15 +236,19 @@ class TestServerIntegration:
     def test_server_tool_registration(self):
         """Verify MCP tool functions exist with correct docstrings."""
         assert callable(mcp_generate_diagram)
+        assert mcp_generate_diagram.__doc__ is not None
         assert 'diagram' in mcp_generate_diagram.__doc__.lower()
 
         assert callable(mcp_get_diagram_examples)
+        assert mcp_get_diagram_examples.__doc__ is not None
         assert 'example' in mcp_get_diagram_examples.__doc__.lower()
 
         assert callable(mcp_list_diagram_icons)
+        assert mcp_list_diagram_icons.__doc__ is not None
         assert 'icon' in mcp_list_diagram_icons.__doc__.lower()
 
         assert callable(mcp_refresh_diagram)
+        assert mcp_refresh_diagram.__doc__ is not None
         assert 'diagram' in mcp_refresh_diagram.__doc__.lower()
 
 
@@ -269,4 +275,5 @@ class TestMcpRefreshDiagram:
             )
 
         assert isinstance(result, CallToolResult)
+        assert result.structuredContent is not None
         assert result.structuredContent['status'] == 'success'
