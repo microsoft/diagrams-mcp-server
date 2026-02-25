@@ -1,6 +1,6 @@
 [project]
 name = "microsoft.azure-diagram-mcp-server"
-version = "0.1.0"
+version = "0.1.1"
 description = "An MCP server that generates professional diagrams using the Python diagrams package DSL, with first-class Azure support"
 readme = "README.md"
 requires-python = ">=3.12"
