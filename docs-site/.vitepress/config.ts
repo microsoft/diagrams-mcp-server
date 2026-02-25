@@ -1,14 +1,17 @@
 import { defineConfig } from 'vitepress'
 
+// Use VITEPRESS_BASE from CI (set by actions/configure-pages) or default for public repos
+const base = (process.env.VITEPRESS_BASE as `/${string}/` | undefined) ?? '/diagrams-mcp-server/'
+
 export default defineConfig({
   title: 'Azure Diagram MCP Server',
   description: 'Generate professional infrastructure diagrams with AI',
-  base: '/diagrams-mcp-server/',
+  base,
   cleanUrls: true,
   appearance: 'dark',
 
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/diagrams-mcp-server/favicon.svg' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: `${base}favicon.svg` }],
   ],
 
   themeConfig: {
