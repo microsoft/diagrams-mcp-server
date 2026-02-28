@@ -111,9 +111,23 @@ The server will generate and execute the Python code to produce a professional d
 
 | Tool | Description |
 |------|-------------|
-| `generate_diagram` | Generate a diagram from Python code using the diagrams DSL |
+| `generate_diagram` | Generate a diagram from Python code using the diagrams DSL (`png` or `svg`) |
+| `refresh_diagram` | Regenerate a diagram from updated code (app-only tool) |
 | `get_diagram_examples` | Get example code for different diagram types |
 | `list_icons` | Discover available icons by provider and service |
+| `preview_bicep_graph` | Parse Bicep source into a resource/dependency graph preview |
+| `generate_diagram_from_bicep` | Parse Bicep source and render a diagram with a returned `graphModel` payload |
+| `update_diagram_from_bicep` | Re-render updated Bicep source and return `graphDiff` when `previous_graph_model` is provided |
+| `select_component` | Resolve selected resource/edge from `graphModel` for app edit flows (app-only) |
+| `preview_edit` | Preview deterministic graph edits and return `graphDiff` without mutating the graph (app-only) |
+| `apply_edit` | Apply deterministic graph edits and return updated `graphModel` + `graphDiff` (app-only) |
+
+## Bicep Roundtrip Workflow (Short)
+
+1. Call `generate_diagram_from_bicep(bicep_code)` to produce diagram output plus `graphModel`.
+2. In the app, resolve and test edits with `select_component`, `preview_edit`, then `apply_edit`.
+3. Convert `graphDiff`/`graphModel` to host-side Bicep patches and update your Bicep source.
+4. Call `update_diagram_from_bicep(updated_bicep_code, previous_graph_model=graphModel)` to re-render and get update diffs.
 
 ## Next Steps
 
