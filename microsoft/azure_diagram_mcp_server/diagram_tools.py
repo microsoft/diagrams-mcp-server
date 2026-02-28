@@ -3,10 +3,12 @@
 
 """Diagram generation and example functions for the Azure Diagram MCP Server."""
 
+import base64
 import diagrams
 import importlib
 import inspect
 import logging
+import mimetypes
 import os
 import platform
 import re
@@ -21,6 +23,7 @@ from microsoft.azure_diagram_mcp_server.models import (
 )
 from microsoft.azure_diagram_mcp_server.scanner import scan_python_code
 from typing import Optional
+from urllib.parse import unquote, urlparse
 
 
 logger = logging.getLogger(__name__)
@@ -38,6 +41,9 @@ _PROVIDERS = [
     'generic',
     'k8s',
 ]
+
+
+_SVG_HREF_RE = re.compile(r'(?P<attr>(?:xlink:)?href)\s*=\s*(?P<quote>["\'])(?P<value>.*?)(?P=quote)')
 
 
 def _build_execution_namespace(output_path: str) -> dict:
@@ -78,12 +84,21 @@ def _build_execution_namespace(output_path: str) -> dict:
     return namespace
 
 
-def _ensure_show_false(code: str, output_path: str) -> str:
+def _normalize_output_format(output_format: str) -> str:
+    """Normalize output format to a supported value for server responses."""
+    fmt = (output_format or 'png').lower().strip()
+    if fmt in {'png', 'svg'}:
+        return fmt
+    raise ValueError('Unsupported output format. Supported values are png and svg.')
+
+
+def _ensure_show_false(code: str, output_path: str, output_format: str) -> str:
     """Process diagram code to ensure show=False and set the output filename.
 
     Args:
         code: The original diagram code.
         output_path: The output file path (without extension) for the diagram.
+        output_format: The desired output format ('png' or 'svg').
 
     Returns:
         The modified code with show=False and filename set.
@@ -110,7 +125,91 @@ def _ensure_show_false(code: str, output_path: str) -> str:
             code,
         )
 
+    # Set/override outformat in Diagram() calls
+    if 'outformat=' not in code:
+        code = re.sub(
+            r'(Diagram\([^)]*)\)',
+            rf'\1, outformat="{output_format}")',
+            code,
+        )
+    else:
+        code = re.sub(
+            r'outformat\s*=\s*(\[[^\]]*\]|["\'][^"\']*["\'])',
+            f'outformat="{output_format}"',
+            code,
+            flags=re.S,
+        )
+
     return code
+
+
+def _resolve_svg_href_to_path(href_value: str, svg_dir: str) -> Optional[str]:
+    """Resolve a local SVG href value to a filesystem path if possible."""
+    value = href_value.strip()
+    if not value:
+        return None
+
+    lowered = value.lower()
+    if (
+        lowered.startswith('data:')
+        or lowered.startswith('http://')
+        or lowered.startswith('https://')
+        or lowered.startswith('#')
+    ):
+        return None
+
+    if lowered.startswith('file://'):
+        parsed = urlparse(value)
+        path = unquote(parsed.path)
+        return path if path else None
+
+    return value if os.path.isabs(value) else os.path.join(svg_dir, value)
+
+
+def _inline_svg_image_references(svg_path: str) -> Optional[str]:
+    """Inline local image href references in an SVG as base64 data URIs."""
+    try:
+        with open(svg_path, encoding='utf-8') as svg_file:
+            svg_text = svg_file.read()
+    except OSError as exc:
+        return f'Failed to read generated SVG file: {exc}'
+
+    svg_dir = os.path.dirname(svg_path)
+    changed = False
+
+    def _replace_href(match: re.Match[str]) -> str:
+        nonlocal changed
+        href_value = match.group('value')
+        resolved_path = _resolve_svg_href_to_path(href_value, svg_dir)
+        if not resolved_path or not os.path.isfile(resolved_path):
+            return match.group(0)
+
+        try:
+            with open(resolved_path, 'rb') as image_file:
+                payload = base64.b64encode(image_file.read()).decode('ascii')
+        except OSError:
+            return match.group(0)
+
+        mime_type, _ = mimetypes.guess_type(resolved_path)
+        if not mime_type:
+            mime_type = 'application/octet-stream'
+
+        changed = True
+        data_uri = f'data:{mime_type};base64,{payload}'
+        quote = match.group('quote')
+        return f'{match.group("attr")}={quote}{data_uri}{quote}'
+
+    inlined_svg = _SVG_HREF_RE.sub(_replace_href, svg_text)
+    if not changed:
+        return None
+
+    try:
+        with open(svg_path, 'w', encoding='utf-8') as svg_file:
+            svg_file.write(inlined_svg)
+    except OSError as exc:
+        return f'Failed to write inlined SVG file: {exc}'
+
+    return None
 
 
 async def generate_diagram(
@@ -118,6 +217,7 @@ async def generate_diagram(
     filename: Optional[str] = None,
     timeout: int = 90,
     workspace_dir: Optional[str] = None,
+    output_format: str = 'png',
 ) -> DiagramGenerateResponse:
     """Generate a diagram from Python code using the diagrams library.
 
@@ -130,6 +230,7 @@ async def generate_diagram(
         filename: Optional output filename (without extension).
         timeout: Timeout in seconds for diagram generation.
         workspace_dir: Optional workspace directory for output files.
+        output_format: Output format for returned diagram ('png' or 'svg').
 
     Returns:
         A DiagramGenerateResponse with the status and file path.
@@ -144,13 +245,23 @@ async def generate_diagram(
             message=f'Security scan failed: {error_msg}',
         )
 
+    try:
+        normalized_output_format = _normalize_output_format(output_format)
+    except ValueError as exc:
+        return DiagramGenerateResponse(
+            status='error',
+            message=str(exc),
+        )
+
     # Generate filename if not provided
     if not filename:
         filename = f'diagram_{uuid.uuid4().hex[:8]}'
 
-    # Remove .png extension if present
-    if filename.endswith('.png'):
-        filename = filename[:-4]
+    # Remove known image extensions if present
+    for ext in ('.png', '.svg'):
+        if filename.endswith(ext):
+            filename = filename[: -len(ext)]
+            break
 
     # Determine output directory and path
     if os.path.isabs(filename):
@@ -168,7 +279,7 @@ async def generate_diagram(
     namespace = _build_execution_namespace(output_path)
 
     # Process code to ensure show=False and set output path
-    processed_code = _ensure_show_false(code, output_path)
+    processed_code = _ensure_show_false(code, output_path, normalized_output_format)
 
     # Execute with platform-aware timeout
     exec_error: Optional[str] = None
@@ -214,18 +325,26 @@ async def generate_diagram(
             message=exec_error,
         )
 
-    # Check for generated .png file
-    png_path = f'{output_path}.png'
-    if not os.path.exists(png_path):
+    # Check for generated output file
+    generated_path = f'{output_path}.{normalized_output_format}'
+    if not os.path.exists(generated_path):
         return DiagramGenerateResponse(
             status='error',
-            message=f'Diagram file was not generated at {png_path}',
+            message=f'Diagram file was not generated at {generated_path}',
         )
+
+    if normalized_output_format == 'svg':
+        inline_error = _inline_svg_image_references(generated_path)
+        if inline_error:
+            return DiagramGenerateResponse(
+                status='error',
+                message=inline_error,
+            )
 
     return DiagramGenerateResponse(
         status='success',
-        path=png_path,
-        message=f'Diagram generated successfully at {png_path}',
+        path=generated_path,
+        message=f'Diagram generated successfully at {generated_path}',
     )
 
 

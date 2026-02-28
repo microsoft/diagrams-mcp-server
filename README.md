@@ -165,17 +165,24 @@ graph TB
     S --> V
     DT --> SC
     SC -->|Pass| DT
-    DT -->|Python DSL| GV[Graphviz → PNG]
+    DT -->|Python DSL| GV[Graphviz → PNG/SVG]
 ```
 
 ## MCP Tools
 
 | Tool | Description |
 |------|-------------|
-| `generate_diagram` | Execute Python diagram code with security scanning and timeout. Pre-imports all providers — just start with `with Diagram(...)`. |
-| `refresh_diagram` | Regenerate a diagram from updated code (app-only, used by the MCP Apps viewer). |
+| `generate_diagram` | Execute Python diagram code with security scanning and timeout. Supports `output_format` of `png` or `svg`. |
+| `refresh_diagram` | Regenerate a diagram from updated code (app-only, used by the MCP Apps viewer). Supports `output_format` of `png` or `svg`. |
 | `get_diagram_examples` | Get example code by type: `azure`, `sequence`, `flow`, `class`, `k8s`, `onprem`, `custom`, or `all`. |
 | `list_icons` | Discover available icons by provider and service. Filter with `provider_filter` and `service_filter`. |
+| `preview_bicep_graph` | Parse Bicep source and return a resource/dependency graph preview for tooling and UI flows. |
+| `generate_diagram_from_bicep` | Parse Bicep source and render a diagram. Returns `graphModel` in `structuredContent` for roundtrip workflows. |
+| `update_diagram_from_bicep` | Re-render from updated Bicep and return `graphDiff` when `previous_graph_model` is provided. |
+| `select_component` | Resolve app-side resource/edge selections against `graphModel` for deterministic edit intents (app-only). |
+| `preview_edit` | Preview deterministic edit intents and return a non-mutating `graphDiff` payload (app-only). |
+| `apply_edit` | Apply deterministic edit intents and return updated `graphModel` + `graphDiff` for host-side Bicep patching (app-only). |
+| `report_diagram_interaction` | App-only event hook for viewer interactions (selection/edit telemetry). |
 
 ### Recommended Workflow
 
@@ -192,10 +199,16 @@ sequenceDiagram
     Copilot->>MCP: get_diagram_examples(diagram_type="azure")
     MCP-->>Copilot: Example code
     Copilot->>MCP: generate_diagram(code="...")
-    MCP-->>Copilot: PNG + structuredContent
+    MCP-->>Copilot: PNG/SVG + structuredContent
     Copilot->>App: Render diagram in viewer
     App-->>User: Interactive diagram with pan/zoom
 ```
+
+### Bicep Roundtrip Workflow
+
+1. **Initial render:** `generate_diagram_from_bicep(bicep_code)` parses Bicep and returns diagram output plus `graphModel`.
+2. **Update render:** after host-side Bicep changes, call `update_diagram_from_bicep(..., previous_graph_model=graphModel)` to get updated output plus `graphDiff`.
+3. **Edit intents:** app uses `select_component` → `preview_edit` → `apply_edit`; the host converts returned `graphDiff`/`graphModel` into Bicep patches, then re-renders via `update_diagram_from_bicep`.
 
 ## MCP Apps Viewer
 
@@ -204,7 +217,7 @@ The server includes an interactive **MCP Apps** viewer that renders diagrams inl
 ```mermaid
 graph LR
     subgraph "MCP Server"
-        GD[generate_diagram] -->|CallToolResult| SC[structuredContent<br/>status + imageData]
+        GD[generate_diagram] -->|CallToolResult| SC[structuredContent<br/>status + renderFormat + imageData/svgData]
         SC --> META["_meta.ui.resourceUri<br/>ui://diagram-viewer/app.html"]
     end
 
@@ -212,9 +225,10 @@ graph LR
         META --> V[Interactive Viewer]
         V --> PAN[Pan & Drag]
         V --> ZOOM[Zoom In/Out]
-        V --> DL[Download PNG]
+        V --> DL[Download PNG/SVG]
         V --> THEME[Dark/Light Theme]
         V --> FIT[Fit to View]
+        V --> SEL[SVG Node/Edge Selection]
     end
 ```
 
@@ -226,7 +240,7 @@ graph LR
 | **Download** | Toolbar download button |
 | **Theme** | Toggle dark/light in toolbar |
 
-The viewer is served as an MCP resource at `ui://diagram-viewer/app.html` and receives the diagram as base64-encoded PNG via `structuredContent.imageData`.
+The viewer is served as an MCP resource at `ui://diagram-viewer/app.html` and receives either PNG (`structuredContent.imageData`) or SVG (`structuredContent.svgData`) depending on `structuredContent.renderFormat`.
 
 ## Quick Example
 

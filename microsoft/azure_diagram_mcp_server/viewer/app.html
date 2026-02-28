@@ -122,6 +122,16 @@
     transform: scale(0.97);
   }
 
+  .toolbar button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .toolbar button:disabled:hover {
+    background: var(--btn-bg);
+    border-color: var(--border-color);
+  }
+
   .toolbar button svg {
     width: 16px;
     height: 16px;
@@ -160,11 +170,23 @@
   .canvas-wrapper {
     position: absolute;
     transform-origin: 0 0;
-    transition: none;
+    transition: opacity 0.2s ease, filter 0.2s ease;
   }
 
   .canvas-wrapper.animating {
-    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transition:
+      transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+      opacity 0.2s ease,
+      filter 0.2s ease;
+  }
+
+  .canvas-wrapper.regenerating {
+    opacity: 0.4;
+    filter: saturate(0.82);
+  }
+
+  .canvas-wrapper.regenerated {
+    animation: diagram-regenerated 0.24s ease-out;
   }
 
   #diagram-image {
@@ -173,6 +195,65 @@
     box-shadow: var(--shadow-elevated);
     border-radius: 4px;
     background: white;
+  }
+
+  [data-theme="dark"] #diagram-image {
+    filter: invert(0.92) hue-rotate(180deg) saturate(0.88) contrast(0.92);
+  }
+
+  #diagram-svg {
+    display: block;
+    max-width: none;
+    box-shadow: var(--shadow-elevated);
+    border-radius: 4px;
+    background: white;
+  }
+
+  #diagram-svg svg {
+    display: block;
+    max-width: none;
+  }
+
+  #diagram-svg svg g.edge {
+    cursor: pointer;
+  }
+
+  #diagram-svg svg g.node {
+    cursor: grab;
+  }
+
+  #diagram-svg svg g.node.dragging {
+    cursor: grabbing;
+    opacity: 0.9;
+  }
+
+  [data-theme="dark"] #diagram-svg svg .graph > polygon:first-of-type {
+    fill: transparent !important;
+  }
+
+  [data-theme="dark"] #diagram-svg svg text {
+    fill: var(--text-primary) !important;
+  }
+
+  [data-theme="dark"] #diagram-svg svg g.edge path,
+  [data-theme="dark"] #diagram-svg svg g.edge polygon {
+    stroke: var(--text-secondary) !important;
+    fill: var(--text-secondary) !important;
+  }
+
+  [data-theme="dark"] #diagram-svg svg g.node polygon,
+  [data-theme="dark"] #diagram-svg svg g.node ellipse,
+  [data-theme="dark"] #diagram-svg svg g.node path,
+  [data-theme="dark"] #diagram-svg svg g.node polyline {
+    stroke: var(--text-secondary) !important;
+  }
+
+  #diagram-svg svg g.selected path,
+  #diagram-svg svg g.selected polygon,
+  #diagram-svg svg g.selected ellipse,
+  #diagram-svg svg g.selected polyline {
+    stroke: var(--accent) !important;
+    stroke-width: 2px !important;
   }
 
   .status-bar {
@@ -234,6 +315,11 @@
     to { transform: rotate(360deg); }
   }
 
+  @keyframes diagram-regenerated {
+    from { opacity: 0.65; }
+    to { opacity: 1; }
+  }
+
   .state-loading p,
   .state-empty p {
     color: var(--text-secondary);
@@ -291,6 +377,11 @@
       <svg viewBox="0 0 16 16"><path d="M2 2h4v1H3v3H2V2zm8 0h4v4h-1V3h-3V2zM3 10v3h3v1H2v-4h1zm10 0v4h-4v-1h3v-3h1z"/></svg>
       Fit
     </button>
+    <div class="toolbar-separator"></div>
+    <button id="btn-ask-selection" title="Ask host about selected component" disabled>
+      <svg viewBox="0 0 16 16"><path d="M2 2h12v8H5l-3 3V2zm1 1v7.6L4.6 9H13V3H3z"/></svg>
+      Ask
+    </button>
     <div class="toolbar-spacer"></div>
     <button id="btn-download" title="Download PNG">
       <svg viewBox="0 0 16 16"><path d="M8 12l-4-4h2.5V2h3v6H12L8 12zm-6 2h12v1H2v-1z"/></svg>
@@ -327,6 +418,7 @@
 
     <!-- Diagram Canvas -->
     <div class="canvas-wrapper" id="canvas-wrapper">
+      <div id="diagram-svg" class="hidden"></div>
       <img id="diagram-image" class="hidden" alt="Azure Architecture Diagram" />
     </div>
   </div>
@@ -342,7 +434,7 @@
   </div>
 
   <script type="module">
-    import { App } from 'https://esm.sh/@modelcontextprotocol/ext-apps';
+    import { App } from 'https://esm.sh/@modelcontextprotocol/ext-apps@1.1.2/dist/src/app-with-deps.js?target=es2022';
 
     // State
     let scale = 1;
@@ -352,7 +444,22 @@
     let dragStartX = 0;
     let dragStartY = 0;
     let currentImageData = null;
+    let currentSvgData = null;
     let currentFilename = 'diagram.png';
+    let currentRenderFormat = 'png';
+    let selectedSvgGroup = null;
+    let isSvgNodeDragging = false;
+    let activeSvgNodeDrag = null;
+    let svgDragStartX = 0;
+    let svgDragStartY = 0;
+    let svgDragBaseX = 0;
+    let svgDragBaseY = 0;
+    let svgDragDeltaX = 0;
+    let svgDragDeltaY = 0;
+    let suppressSvgClick = false;
+    let regenerationSequence = 0;
+    let regenerationTimerId = null;
+    let selectedElementContext = null;
 
     const MIN_SCALE = 0.1;
     const MAX_SCALE = 10;
@@ -362,6 +469,7 @@
     const container = document.getElementById('canvas-container');
     const wrapper = document.getElementById('canvas-wrapper');
     const img = document.getElementById('diagram-image');
+    const svgContainer = document.getElementById('diagram-svg');
     const stateLoading = document.getElementById('state-loading');
     const stateEmpty = document.getElementById('state-empty');
     const stateError = document.getElementById('state-error');
@@ -370,18 +478,125 @@
     const statusDot = document.getElementById('status-dot');
     const statusText = document.getElementById('status-text');
     const statusFilename = document.getElementById('status-filename');
+    const askSelectionButton = document.getElementById('btn-ask-selection');
+    const app = new App({ name: 'Diagram Viewer', version: '1.2.0' });
+
+    function normalizeHostContext(rawContext) {
+      if (!rawContext || typeof rawContext !== 'object') {
+        return {};
+      }
+
+      if (rawContext.hostContext && typeof rawContext.hostContext === 'object') {
+        return rawContext.hostContext;
+      }
+
+      if (rawContext.params && typeof rawContext.params === 'object') {
+        const params = rawContext.params;
+        if (params.hostContext && typeof params.hostContext === 'object') {
+          return params.hostContext;
+        }
+        return params;
+      }
+
+      return rawContext;
+    }
+
+    function extractTheme(rawContext) {
+      const context = normalizeHostContext(rawContext);
+      const theme = context.theme;
+      if (typeof theme !== 'string') {
+        return null;
+      }
+      const normalizedTheme = theme.toLowerCase();
+      return normalizedTheme === 'dark' || normalizedTheme === 'light' ? normalizedTheme : null;
+    }
+
+    function applyHostStyles(ctx) {
+      const context = normalizeHostContext(ctx);
+      const variables = context?.styles?.variables;
+      if (!variables || typeof variables !== 'object') {
+        return;
+      }
+
+      for (const [name, value] of Object.entries(variables)) {
+        if (typeof name !== 'string' || !name.startsWith('--')) {
+          continue;
+        }
+        document.documentElement.style.setProperty(name, String(value));
+      }
+    }
+
+    function setTheme(theme) {
+      const isDark = theme === 'dark';
+      document.body.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      document.getElementById('icon-sun').classList.toggle('hidden', isDark);
+      document.getElementById('icon-moon').classList.toggle('hidden', !isDark);
+    }
 
     function updateTransform() {
       wrapper.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
       zoomDisplay.textContent = `${Math.round(scale * 100)}%`;
     }
 
+    function beginRegenerationTransition() {
+      regenerationSequence += 1;
+      wrapper.classList.remove('regenerated');
+      wrapper.classList.add('regenerating');
+      return regenerationSequence;
+    }
+
+    function finishRegenerationTransition(sequence) {
+      if (sequence !== regenerationSequence) return;
+      wrapper.classList.remove('regenerating');
+      wrapper.classList.add('regenerated');
+      if (regenerationTimerId) {
+        window.clearTimeout(regenerationTimerId);
+      }
+      regenerationTimerId = window.setTimeout(() => {
+        wrapper.classList.remove('regenerated');
+      }, 260);
+    }
+
+    function getContentDimensions() {
+      if (currentRenderFormat === 'svg') {
+        const svg = svgContainer.querySelector('svg');
+        if (!svg) return null;
+
+        const viewBox = svg.viewBox?.baseVal;
+        if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
+          return { width: viewBox.width, height: viewBox.height };
+        }
+
+        const attrWidth = Number.parseFloat(svg.getAttribute('width') || '');
+        const attrHeight = Number.parseFloat(svg.getAttribute('height') || '');
+        if (Number.isFinite(attrWidth) && Number.isFinite(attrHeight) && attrWidth > 0 && attrHeight > 0) {
+          return { width: attrWidth, height: attrHeight };
+        }
+
+        try {
+          const bbox = svg.getBBox();
+          if (bbox.width > 0 && bbox.height > 0) {
+            return { width: bbox.width, height: bbox.height };
+          }
+        } catch {
+          // Ignore getBBox failures and use element dimensions.
+        }
+
+        return { width: Math.max(svg.clientWidth, 1), height: Math.max(svg.clientHeight, 1) };
+      }
+
+      if (!img.naturalWidth || !img.naturalHeight) return null;
+      return { width: img.naturalWidth, height: img.naturalHeight };
+    }
+
     function fitToView() {
-      if (!img.naturalWidth || !img.naturalHeight) return;
+      const dimensions = getContentDimensions();
+      if (!dimensions) return;
+
       const cw = container.clientWidth;
       const ch = container.clientHeight;
-      const iw = img.naturalWidth;
-      const ih = img.naturalHeight;
+      const iw = dimensions.width;
+      const ih = dimensions.height;
       const padding = 40;
       const scaleX = (cw - padding * 2) / iw;
       const scaleY = (ch - padding * 2) / ih;
@@ -408,6 +623,11 @@
       stateEmpty.classList.add('hidden');
       stateError.classList.add('hidden');
       img.classList.add('hidden');
+      svgContainer.classList.add('hidden');
+      if (state !== 'diagram') {
+        wrapper.classList.remove('regenerating');
+        wrapper.classList.remove('regenerated');
+      }
 
       if (state === 'loading') {
         stateLoading.classList.remove('hidden');
@@ -423,9 +643,248 @@
         statusDot.className = 'status-dot';
         statusText.textContent = 'Ready';
       } else if (state === 'diagram') {
-        img.classList.remove('hidden');
+        if (currentRenderFormat === 'svg') {
+          svgContainer.classList.remove('hidden');
+        } else {
+          img.classList.remove('hidden');
+        }
         statusDot.className = 'status-dot';
         statusText.textContent = 'Diagram loaded';
+      }
+    }
+
+    function clearSelection() {
+      if (selectedSvgGroup) {
+        selectedSvgGroup.classList.remove('selected');
+        selectedSvgGroup = null;
+      }
+      selectedElementContext = null;
+      askSelectionButton.disabled = true;
+      askSelectionButton.title = 'Select a component first';
+    }
+
+    function setSelectedContext(selection) {
+      selectedElementContext = selection;
+      askSelectionButton.disabled = !selection;
+      if (!selection) {
+        askSelectionButton.title = 'Select a component first';
+        return;
+      }
+
+      const elementLabel = selection.elementLabel ? ` (${selection.elementLabel})` : '';
+      askSelectionButton.title = `Ask host about ${selection.elementKind} ${selection.elementId}${elementLabel}`;
+    }
+
+    function getSvgGroupLabel(group) {
+      const titleElement = group.querySelector('title');
+      const label = titleElement?.textContent?.trim();
+      return label || null;
+    }
+
+    async function askHostAboutSelection() {
+      if (!selectedElementContext) {
+        statusText.textContent = 'Select a component first.';
+        return;
+      }
+
+      const question = `What can you tell me about this ${selectedElementContext.elementKind} (${selectedElementContext.elementId})?`;
+
+      const selectionContext = {
+        selectedElement: selectedElementContext,
+        selectedComponent: selectedElementContext,
+        path: statusFilename.textContent || null,
+        renderFormat: currentRenderFormat,
+      };
+
+      try {
+        await app.updateModelContext({
+          structuredContent: {
+            diagramViewer: selectionContext,
+          },
+        });
+      } catch {
+        // Host may reject or ignore model context updates.
+      }
+
+      try {
+        await app.sendMessage({
+          role: 'user',
+          content: [{ type: 'text', text: question }],
+        });
+        statusText.textContent = 'Sent selection question to host.';
+      } catch {
+        statusText.textContent = 'Unable to send question to host.';
+      }
+    }
+
+    async function emitSelection(selection) {
+      try {
+        await app.callServerTool({
+          name: 'report_diagram_interaction',
+          arguments: {
+            event_type: 'select',
+            element_id: selection.elementId,
+            element_kind: selection.elementKind,
+          },
+        });
+      } catch {
+        // Host/server may not support this tool yet.
+      }
+
+      try {
+        await app.updateModelContext({
+          structuredContent: {
+            diagramViewer: {
+              selectedElement: selection,
+              selectedComponent: selection,
+              path: statusFilename.textContent || null,
+              renderFormat: currentRenderFormat,
+            },
+          },
+        });
+      } catch {
+        // Host may reject or ignore model context updates.
+      }
+    }
+
+    async function emitDragEnd(interaction) {
+      try {
+        await app.callServerTool({
+          name: 'report_diagram_interaction',
+          arguments: {
+            event_type: 'drag_end',
+            element_id: interaction.elementId,
+            element_kind: interaction.elementKind,
+          },
+        });
+      } catch {
+        // Host/server may not support this tool yet.
+      }
+
+      try {
+        await app.updateModelContext({
+          structuredContent: {
+            diagramViewer: {
+              movedElement: interaction,
+              path: statusFilename.textContent || null,
+              renderFormat: currentRenderFormat,
+            },
+          },
+        });
+      } catch {
+        // Host may reject or ignore model context updates.
+      }
+    }
+
+    function animateSvgEdges(svg) {
+      const edgePaths = svg.querySelectorAll('g.edge path');
+      edgePaths.forEach((path) => {
+        try {
+          const length = path.getTotalLength();
+          path.style.strokeDasharray = `${length}`;
+          path.style.strokeDashoffset = `${length}`;
+          path.style.transition = 'stroke-dashoffset 0.9s ease-out';
+          requestAnimationFrame(() => {
+            path.style.strokeDashoffset = '0';
+          });
+        } catch {
+          // Ignore paths that don't support length computation.
+        }
+      });
+    }
+
+    function sanitizeSvg(svgText) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgText, 'image/svg+xml');
+      const svg = doc.querySelector('svg');
+      if (!svg) return null;
+
+      doc.querySelectorAll('script, foreignObject').forEach((el) => el.remove());
+      doc.querySelectorAll('*').forEach((el) => {
+        Array.from(el.attributes).forEach((attr) => {
+          if (attr.name.toLowerCase().startsWith('on')) {
+            el.removeAttribute(attr.name);
+          }
+        });
+      });
+
+      return svg;
+    }
+
+    function renderSvg(svgText, regenerationId = null) {
+      const svg = sanitizeSvg(svgText);
+      if (!svg) {
+        showState('error', 'Invalid SVG data received.');
+        if (regenerationId !== null) {
+          finishRegenerationTransition(regenerationId);
+        }
+        return;
+      }
+
+      clearSelection();
+      currentSvgData = svgText;
+      currentImageData = null;
+      currentRenderFormat = 'svg';
+
+      svgContainer.innerHTML = '';
+      svgContainer.appendChild(svg);
+
+      svg.addEventListener('mousedown', (event) => {
+        if (event.button !== 0) return;
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+
+        const nodeGroup = target.closest('g.node');
+        if (!nodeGroup) return;
+
+        isSvgNodeDragging = true;
+        activeSvgNodeDrag = nodeGroup;
+        svgDragStartX = event.clientX;
+        svgDragStartY = event.clientY;
+        svgDragBaseX = Number.parseFloat(activeSvgNodeDrag.dataset.dragX || '0');
+        svgDragBaseY = Number.parseFloat(activeSvgNodeDrag.dataset.dragY || '0');
+        if (!Number.isFinite(svgDragBaseX)) svgDragBaseX = 0;
+        if (!Number.isFinite(svgDragBaseY)) svgDragBaseY = 0;
+        svgDragDeltaX = svgDragBaseX;
+        svgDragDeltaY = svgDragBaseY;
+        activeSvgNodeDrag.classList.add('dragging');
+        event.preventDefault();
+        event.stopPropagation();
+      });
+
+      svg.addEventListener('click', (event) => {
+        if (suppressSvgClick) {
+          suppressSvgClick = false;
+          return;
+        }
+
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+
+        const group = target.closest('g.node, g.edge');
+        if (!group) return;
+
+        clearSelection();
+        selectedSvgGroup = group;
+        selectedSvgGroup.classList.add('selected');
+
+        const elementKind = group.classList.contains('node') ? 'node' : 'edge';
+        const elementId = group.id || `${elementKind}-unknown`;
+        const selection = {
+          elementId,
+          elementKind,
+          elementLabel: getSvgGroupLabel(group),
+        };
+        setSelectedContext(selection);
+        statusText.textContent = `Selected ${elementKind}: ${elementId}`;
+        void emitSelection(selection);
+      });
+
+      animateSvgEdges(svg);
+      showState('diagram');
+      fitToView();
+      if (regenerationId !== null) {
+        finishRegenerationTransition(regenerationId);
       }
     }
 
@@ -438,22 +897,46 @@
         showState('error', data.message);
         return;
       }
-      if (!data.imageData) {
+      if (!data.imageData && !data.svgData) {
         showState('empty');
-        statusText.textContent = data.message || 'No image data';
+        statusText.textContent = data.message || 'No diagram data';
         return;
       }
 
-      currentImageData = data.imageData;
+      currentRenderFormat = data.renderFormat === 'svg' ? 'svg' : 'png';
       if (data.path) {
         const parts = data.path.replace(/\\/g, '/').split('/');
         currentFilename = parts[parts.length - 1] || 'diagram.png';
         statusFilename.textContent = data.path;
+      } else {
+        currentFilename = `diagram.${currentRenderFormat}`;
+        statusFilename.textContent = '';
       }
 
+      if (!currentFilename.toLowerCase().endsWith(`.${currentRenderFormat}`)) {
+        currentFilename = `${currentFilename}.${currentRenderFormat}`;
+      }
+
+      const regenerationId = beginRegenerationTransition();
+
+      if (currentRenderFormat === 'svg' && data.svgData) {
+        renderSvg(data.svgData, regenerationId);
+        return;
+      }
+
+      currentImageData = data.imageData;
+      currentSvgData = null;
+      clearSelection();
       img.onload = () => {
+        if (regenerationId !== regenerationSequence) return;
         showState('diagram');
         fitToView();
+        finishRegenerationTransition(regenerationId);
+      };
+      img.onerror = () => {
+        if (regenerationId !== regenerationSequence) return;
+        showState('error', 'Unable to render PNG diagram payload.');
+        finishRegenerationTransition(regenerationId);
       };
       img.src = `data:image/png;base64,${data.imageData}`;
     }
@@ -468,6 +951,13 @@
     });
 
     window.addEventListener('mousemove', (e) => {
+      if (isSvgNodeDragging && activeSvgNodeDrag) {
+        svgDragDeltaX = svgDragBaseX + (e.clientX - svgDragStartX) / scale;
+        svgDragDeltaY = svgDragBaseY + (e.clientY - svgDragStartY) / scale;
+        activeSvgNodeDrag.style.transform = `translate(${svgDragDeltaX}px, ${svgDragDeltaY}px)`;
+        return;
+      }
+
       if (!isDragging) return;
       panX = e.clientX - dragStartX;
       panY = e.clientY - dragStartY;
@@ -475,6 +965,39 @@
     });
 
     window.addEventListener('mouseup', () => {
+      if (isSvgNodeDragging && activeSvgNodeDrag) {
+        const deltaX = svgDragDeltaX - svgDragBaseX;
+        const deltaY = svgDragDeltaY - svgDragBaseY;
+        const hasMoved = Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5;
+        activeSvgNodeDrag.classList.remove('dragging');
+        activeSvgNodeDrag.dataset.dragX = `${svgDragDeltaX}`;
+        activeSvgNodeDrag.dataset.dragY = `${svgDragDeltaY}`;
+        if (hasMoved) {
+          suppressSvgClick = true;
+          window.setTimeout(() => {
+            suppressSvgClick = false;
+          }, 0);
+          const elementId = activeSvgNodeDrag.id || 'node-unknown';
+          const movedSelection = {
+            elementId,
+            elementKind: 'node',
+            elementLabel: getSvgGroupLabel(activeSvgNodeDrag),
+          };
+          setSelectedContext(movedSelection);
+          statusText.textContent = `Moved node: ${elementId}`;
+          void emitDragEnd({
+            elementId,
+            elementKind: 'node',
+            deltaX: Number(deltaX.toFixed(2)),
+            deltaY: Number(deltaY.toFixed(2)),
+            offsetX: Number(svgDragDeltaX.toFixed(2)),
+            offsetY: Number(svgDragDeltaY.toFixed(2)),
+          });
+        }
+        isSvgNodeDragging = false;
+        activeSvgNodeDrag = null;
+      }
+
       isDragging = false;
       container.style.cursor = 'grab';
     });
@@ -501,8 +1024,25 @@
     });
 
     document.getElementById('btn-fit').addEventListener('click', fitToView);
+    document.getElementById('btn-ask-selection').addEventListener('click', () => {
+      void askHostAboutSelection();
+    });
 
     document.getElementById('btn-download').addEventListener('click', () => {
+      if (currentRenderFormat === 'svg') {
+        if (!currentSvgData) return;
+        const blob = new Blob([currentSvgData], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = currentFilename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        return;
+      }
+
       if (!currentImageData) return;
       const a = document.createElement('a');
       a.href = `data:image/png;base64,${currentImageData}`;
@@ -515,9 +1055,7 @@
     document.getElementById('btn-theme').addEventListener('click', () => {
       const body = document.body;
       const isDark = body.getAttribute('data-theme') === 'dark';
-      body.setAttribute('data-theme', isDark ? 'light' : 'dark');
-      document.getElementById('icon-sun').classList.toggle('hidden', !isDark);
-      document.getElementById('icon-moon').classList.toggle('hidden', isDark);
+      setTheme(isDark ? 'light' : 'dark');
     });
 
     // Keyboard shortcuts
@@ -538,25 +1076,40 @@
 
     // Resize handler
     window.addEventListener('resize', () => {
-      if (!img.classList.contains('hidden')) fitToView();
+      if (!img.classList.contains('hidden') || !svgContainer.classList.contains('hidden')) {
+        fitToView();
+      }
     });
 
     // MCP App integration
-    const app = new App({ name: 'Diagram Viewer', version: '1.0.0' });
-
     app.ontoolresult = (result) => {
       const data = result.structuredContent;
       showDiagram(data);
     };
 
-    // Detect host theme preference
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      document.body.setAttribute('data-theme', 'dark');
-      document.getElementById('icon-sun').classList.add('hidden');
-      document.getElementById('icon-moon').classList.remove('hidden');
-    }
+    app.onhostcontextchanged = (rawContext) => {
+      applyHostStyles(rawContext);
+      const theme = extractTheme(rawContext);
+      if (theme) {
+        setTheme(theme);
+      }
+    };
 
-    app.connect();
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setTheme(prefersDark ? 'dark' : 'light');
+
+    app.connect()
+      .then(() => {
+        const hostContext = app.getHostContext();
+        applyHostStyles(hostContext);
+        const theme = extractTheme(hostContext);
+        if (theme) {
+          setTheme(theme);
+        }
+      })
+      .catch(() => {
+        // Fallback to local theme controls only if app connection fails.
+      });
   </script>
 </body>
 </html>

@@ -9,6 +9,7 @@ import shutil
 import signal
 import sys
 from microsoft.azure_diagram_mcp_server.diagram_tools import (
+    _inline_svg_image_references,
     generate_diagram,
     get_diagram_examples,
     list_diagram_icons,
@@ -284,6 +285,92 @@ class TestGenerateDiagram:
         assert result.status == 'success'
         assert result.path is not None
         assert 'overridden_test' in result.path
+
+    @requires_graphviz
+    @pytest.mark.asyncio
+    async def test_generate_diagram_svg_output(self, azure_diagram_code, temp_workspace_dir):
+        """Diagram generation supports SVG output format."""
+        result = await generate_diagram(
+            code=azure_diagram_code,
+            filename='svg_test',
+            workspace_dir=temp_workspace_dir,
+            output_format='svg',
+        )
+        assert result.status == 'success'
+        assert result.path is not None
+        assert result.path.endswith('.svg')
+        assert os.path.exists(result.path)
+
+    @pytest.mark.asyncio
+    async def test_generate_diagram_with_invalid_output_format(
+        self, azure_diagram_code, temp_workspace_dir
+    ):
+        """Invalid output formats return an error response."""
+        result = await generate_diagram(
+            code=azure_diagram_code,
+            filename='invalid_format',
+            workspace_dir=temp_workspace_dir,
+            output_format='gif',
+        )
+        assert result.status == 'error'
+        assert 'output format' in result.message.lower()
+
+
+class TestSvgInlining:
+    """Tests for post-processing generated SVG files."""
+
+    def test_inline_local_image_references(self, tmp_path):
+        """Local SVG href values are replaced with base64 data URIs."""
+        abs_icon = tmp_path / 'server.png'
+        rel_dir = tmp_path / 'icons'
+        rel_dir.mkdir()
+        rel_icon = rel_dir / 'db.png'
+
+        abs_icon.write_bytes(b'\x89PNG\r\n\x1a\n')
+        rel_icon.write_bytes(b'\x89PNG\r\n\x1a\n')
+
+        svg_path = tmp_path / 'diagram.svg'
+        svg_path.write_text(
+            (
+                '<svg xmlns="http://www.w3.org/2000/svg">'
+                f'<image xlink:href="{abs_icon}" />'
+                '<image href="icons/db.png" />'
+                '<image href="https://example.com/logo.png" />'
+                '</svg>'
+            ),
+            encoding='utf-8',
+        )
+
+        error_message = _inline_svg_image_references(str(svg_path))
+
+        assert error_message is None
+        updated_svg = svg_path.read_text(encoding='utf-8')
+        assert 'data:image/png;base64,' in updated_svg
+        assert str(abs_icon) not in updated_svg
+        assert 'icons/db.png' not in updated_svg
+        assert 'https://example.com/logo.png' in updated_svg
+
+    def test_inline_file_uri_reference(self, tmp_path):
+        """file:// image href values are inlined as data URIs."""
+        icon = tmp_path / 'postgres.png'
+        icon.write_bytes(b'\x89PNG\r\n\x1a\n')
+
+        svg_path = tmp_path / 'diagram.svg'
+        svg_path.write_text(
+            (
+                '<svg xmlns="http://www.w3.org/2000/svg">'
+                f'<image href="{icon.as_uri()}" />'
+                '</svg>'
+            ),
+            encoding='utf-8',
+        )
+
+        error_message = _inline_svg_image_references(str(svg_path))
+
+        assert error_message is None
+        updated_svg = svg_path.read_text(encoding='utf-8')
+        assert 'data:image/png;base64,' in updated_svg
+        assert icon.as_uri() not in updated_svg
 
 
 class TestCrossPlatformTimeout:
